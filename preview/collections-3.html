@@ -3,134 +3,94 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MPUI 3-Panel Preview</title>
+    <title>MPUI Compact - 3 Panels Cases</title>
     <link rel="stylesheet" href="../styles/tokens.css" />
-    <style>
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: var(--font-family-base);
-        font-size: var(--font-size-14);
-        color: var(--text-primary);
-        background: var(--bg-app);
-      }
-      .topbar {
-        height: var(--topbar-height);
-        background: var(--bg-panel);
-        border-bottom: 1px solid var(--divider);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 var(--space-3);
-      }
-      .topbar h1 { margin: 0; font-size: var(--font-size-16); }
-      .topbar .meta { color: var(--text-secondary); font-size: var(--font-size-13); }
-      .page { padding: var(--app-padding); display: grid; gap: var(--space-3); }
-      .section {
-        background: var(--bg-panel);
-        border: 1px solid var(--border-default);
-        border-radius: var(--radius-md);
-        padding: var(--space-2);
-      }
-      .section h2 { margin: 0 0 var(--space-2) 0; font-size: var(--font-size-13); color: var(--text-secondary); }
-      .layout { display: grid; gap: var(--section-gap); }
-      .layout.horizontal { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .layout.vertical { grid-template-columns: 1fr; }
-      .panel {
-        background: var(--bg-panel);
-        border: 1px solid var(--border-default);
-        border-radius: var(--radius-md);
-        overflow: hidden;
-        min-height: 340px;
-      }
-      .panel-header {
-        height: var(--tab-height);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 var(--space-3);
-        border-bottom: 1px solid var(--divider);
-        background: var(--bg-subtle);
-      }
-      .panel-title { font-size: var(--font-size-13); font-weight: var(--font-weight-semibold); }
-      .panel-subtitle { font-size: var(--font-size-12); color: var(--text-secondary); }
-      .toolbar {
-        padding: var(--space-2);
-        display: grid;
-        grid-template-columns: 1fr auto auto;
-        gap: var(--space-2);
-        border-bottom: 1px solid var(--divider);
-      }
-      .input { height: var(--control-height-default); border: 1px solid var(--border-default); border-radius: var(--radius-sm); padding: 0 var(--space-2); font-size: var(--font-size-13); }
-      .btn { height: var(--control-height-default); border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-panel); padding: 0 var(--space-3); }
-      .table-wrap { padding: var(--space-2); }
-      table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid var(--border-default); }
-      thead tr { height: var(--table-header-height); background: var(--bg-subtle); }
-      th, td {
-        padding: 0 var(--space-2);
-        border-bottom: 1px solid var(--divider);
-        font-size: var(--font-size-13);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-align: left;
-      }
-      tbody tr { height: var(--table-row-height); }
-      tbody tr:nth-child(even) { background: #fcfdff; }
-      tbody tr.selected { background: var(--bg-selected); }
-      .mono { font-family: var(--font-family-mono); }
-      .number { text-align: right; }
-      @media (max-width: 1400px) { .layout.horizontal { grid-template-columns: 1fr 1fr; } }
-      @media (max-width: 1100px) { .layout.horizontal { grid-template-columns: 1fr; } }
-    </style>
+    <link rel="stylesheet" href="../styles/preview.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
   </head>
   <body>
-    <header class="topbar">
-      <h1>3 Panels Preview</h1>
-      <div class="meta">가로/세로 배치 비교</div>
-    </header>
-    <main class="page">
-      <section class="section">
-        <h2>가로 배치 (옆으로)</h2>
-        <div class="layout horizontal">
-          <article class="panel">
-            <div class="panel-header"><div class="panel-title">A / orders</div><div class="panel-subtitle">prod.example.com</div></div>
-            <div class="toolbar"><input class="input mono" value='status="paid" && total >= 100' /><button class="btn">Prev</button><button class="btn">Next</button></div>
-            <div class="table-wrap"><table><thead><tr><th>ID</th><th>Status</th><th>Total</th><th>Created</th></tr></thead><tbody><tr class="selected"><td class="mono">ord_1j2k9</td><td>paid</td><td class="mono number">120.00</td><td class="mono">2026-02-06</td></tr><tr><td class="mono">ord_8w9q2</td><td>paid</td><td class="mono number">350.00</td><td class="mono">2026-02-06</td></tr></tbody></table></div>
-          </article>
-          <article class="panel">
-            <div class="panel-header"><div class="panel-title">B / users</div><div class="panel-subtitle">staging.example.com</div></div>
-            <div class="toolbar"><input class="input mono" value='verified=true && created >= "2026-01-01"' /><button class="btn">Prev</button><button class="btn">Next</button></div>
-            <div class="table-wrap"><table><thead><tr><th>ID</th><th>Email</th><th>Verified</th><th>Created</th></tr></thead><tbody><tr class="selected"><td class="mono">usr_92ab1</td><td>alpha@example.com</td><td>true</td><td class="mono">2026-02-05</td></tr><tr><td class="mono">usr_73qq4</td><td>beta@example.com</td><td>true</td><td class="mono">2026-02-04</td></tr></tbody></table></div>
-          </article>
-          <article class="panel">
-            <div class="panel-header"><div class="panel-title">C / payments</div><div class="panel-subtitle">prod.example.com</div></div>
-            <div class="toolbar"><input class="input mono" value='method="card" && amount > 50' /><button class="btn">Prev</button><button class="btn">Next</button></div>
-            <div class="table-wrap"><table><thead><tr><th>ID</th><th>Method</th><th>Amount</th><th>Created</th></tr></thead><tbody><tr class="selected"><td class="mono">pay_52as8</td><td>card</td><td class="mono number">90.00</td><td class="mono">2026-02-06</td></tr><tr><td class="mono">pay_81fd4</td><td>card</td><td class="mono number">210.00</td><td class="mono">2026-02-05</td></tr></tbody></table></div>
-          </article>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <h1 class="brand-name">3 Panels Cases</h1>
+          <p class="brand-tag">Case Hub</p>
         </div>
-      </section>
+        <div class="topbar-actions">
+          <a class="button" href="./collections-3-horizontal.html"><i class="fa-solid fa-left-right"></i> Horizontal Case</a>
+          <a class="button" href="./collections-3-vertical.html"><i class="fa-solid fa-up-down"></i> Vertical Case</a>
+          <a class="button ghost" href="./index.html"><i class="fa-solid fa-house"></i> Index</a>
+        </div>
+      </header>
 
-      <section class="section">
-        <h2>세로 배치 (위/아래)</h2>
-        <div class="layout vertical">
-          <article class="panel">
-            <div class="panel-header"><div class="panel-title">A / orders</div><div class="panel-subtitle">prod.example.com</div></div>
-            <div class="toolbar"><input class="input mono" value='status="paid" && total >= 100' /><button class="btn">Prev</button><button class="btn">Next</button></div>
-            <div class="table-wrap"><table><thead><tr><th>ID</th><th>Status</th><th>Total</th><th>Created</th></tr></thead><tbody><tr class="selected"><td class="mono">ord_1j2k9</td><td>paid</td><td class="mono number">120.00</td><td class="mono">2026-02-06</td></tr><tr><td class="mono">ord_8w9q2</td><td>paid</td><td class="mono number">350.00</td><td class="mono">2026-02-06</td></tr></tbody></table></div>
+      <main class="workspace">
+        <aside class="side-panel left">
+          <div class="side-head">
+            <h2 class="side-title">Explorer</h2>
+            <p class="side-subtitle">3패널 케이스 선택 허브</p>
+          </div>
+          <div class="side-body">
+            <label class="field-group">
+              <span class="field-label">Panel Count</span>
+              <select class="select">
+                <option selected>3 Panels</option>
+              </select>
+            </label>
+
+            <div class="field-group">
+              <span class="field-label">Available Cases</span>
+              <ul class="list">
+                <li class="list-item active"><span>Horizontal</span><span>1 row</span></li>
+                <li class="list-item"><span>Vertical</span><span>1 column</span></li>
+              </ul>
+            </div>
+
+            <div class="field-group">
+              <span class="field-label">Navigation</span>
+              <ul class="list">
+                <li class="list-item"><span>2P Hub</span><a href="./collections-2.html">Go</a></li>
+                <li class="list-item"><span>3P Hub</span><a href="./collections-3.html">Go</a></li>
+                <li class="list-item"><span>4P Hub</span><a href="./collections-4.html">Go</a></li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+
+        <section class="main-canvas">
+          <article class="hero">
+            <p class="hero-kicker">Case Hub</p>
+            <h2 class="hero-title">3P LAYOUT SPLIT</h2>
+            <p class="hero-desc">가로 배치와 세로 배치를 별도 페이지로 분리해 비교 기준을 명확히 했습니다.</p>
+            <div class="hero-links">
+              <a class="button" href="./collections-3-horizontal.html"><i class="fa-solid fa-arrow-right"></i> Open Horizontal</a>
+              <a class="button" href="./collections-3-vertical.html"><i class="fa-solid fa-arrow-right"></i> Open Vertical</a>
+            </div>
           </article>
-          <article class="panel">
-            <div class="panel-header"><div class="panel-title">B / users</div><div class="panel-subtitle">staging.example.com</div></div>
-            <div class="toolbar"><input class="input mono" value='verified=true && created >= "2026-01-01"' /><button class="btn">Prev</button><button class="btn">Next</button></div>
-            <div class="table-wrap"><table><thead><tr><th>ID</th><th>Email</th><th>Verified</th><th>Created</th></tr></thead><tbody><tr class="selected"><td class="mono">usr_92ab1</td><td>alpha@example.com</td><td>true</td><td class="mono">2026-02-05</td></tr><tr><td class="mono">usr_73qq4</td><td>beta@example.com</td><td>true</td><td class="mono">2026-02-04</td></tr></tbody></table></div>
+
+          <article class="canvas-toolbar">
+            <div>
+              <h3 class="toolbar-title">Choose A Case</h3>
+              <p class="toolbar-meta">허브에서는 케이스 선택만 제공하고 테이블은 표시하지 않습니다.</p>
+            </div>
+            <span class="status-chip"><i class="fa-solid fa-diagram-project"></i> 2 Cases</span>
           </article>
-          <article class="panel">
-            <div class="panel-header"><div class="panel-title">C / payments</div><div class="panel-subtitle">prod.example.com</div></div>
-            <div class="toolbar"><input class="input mono" value='method="card" && amount > 50' /><button class="btn">Prev</button><button class="btn">Next</button></div>
-            <div class="table-wrap"><table><thead><tr><th>ID</th><th>Method</th><th>Amount</th><th>Created</th></tr></thead><tbody><tr class="selected"><td class="mono">pay_52as8</td><td>card</td><td class="mono number">90.00</td><td class="mono">2026-02-06</td></tr><tr><td class="mono">pay_81fd4</td><td>card</td><td class="mono number">210.00</td><td class="mono">2026-02-05</td></tr></tbody></table></div>
+
+          <article class="panel-scene">
+            <div class="route-grid case-grid">
+              <a class="route-card" href="./collections-3-horizontal.html">
+                <h3 class="route-title">Horizontal Case</h3>
+                <p class="route-desc">3개 패널을 한 줄로 배치합니다.</p>
+                <p class="route-meta"><span>layout-row-3</span><i class="fa-solid fa-arrow-right"></i></p>
+              </a>
+
+              <a class="route-card" href="./collections-3-vertical.html">
+                <h3 class="route-title">Vertical Case</h3>
+                <p class="route-desc">3개 패널을 위아래 한 열로 배치합니다.</p>
+                <p class="route-meta"><span>layout-stack</span><i class="fa-solid fa-arrow-right"></i></p>
+              </a>
+            </div>
           </article>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
   </body>
 </html>
