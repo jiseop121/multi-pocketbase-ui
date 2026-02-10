@@ -4,6 +4,7 @@
 정책 배경보다 구현 기준을 우선한다.
 
 관련 문서:
+- 문서 권한/우선순위: `docs/docs-index.md`
 - 제품 요약: `README.md`
 - 타입/상태 계약: `docs/spec-contracts.md`
 - UI 디자인 상세: `docs/ui-design-spec.md`
@@ -137,10 +138,10 @@
 - 기타 인증 관련 정보
 
 권장 키 이름:
-- `mpui.instances.v1`
-- `mpui.tableViewPresets.v1`
-- `mpui.workspacePresets.v1`
-- `mpui.favorites.v1`
+- `pbmulti.instances.v1`
+- `pbmulti.tableViewPresets.v1`
+- `pbmulti.workspacePresets.v1`
+- `pbmulti.favorites.v1`
 
 ### 4.2 메모리 저장(Runtime)
 

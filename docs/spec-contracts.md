@@ -1,6 +1,7 @@
 # Multi PocketBase UI - 타입/상태 전이 계약
 
 `docs/ui-spec.md`의 확정 정책을 코드로 옮기기 위한 기준 문서다.
+문서 우선순위 판단은 `docs/docs-index.md`를 따른다.
 
 ## 1) TypeScript 인터페이스
 
