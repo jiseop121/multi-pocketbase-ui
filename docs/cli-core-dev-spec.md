@@ -171,3 +171,76 @@ Track 2 상세 기준은 `docs/ui-mode-dev-spec.md`를 따른다.
   - `page`, `perPage`, `totalItems`, `totalPages`
 - 결과가 없으면 빈 테이블과 `0 rows`를 출력한다.
 
+### 9.9 정상 출력 예시 (`stdout`)
+
+예시 A) `pbmulti db list`
+```text
++----------+----------------------------+
+| DB ALIAS | BASE URL                   |
++----------+----------------------------+
+| dev      | http://127.0.0.1:8090      |
+| stage    | https://pb-stage.acme.com  |
++----------+----------------------------+
+2 rows
+```
+
+예시 B) `pbmulti api records --db dev --superuser root --collection posts --page 1 --per-page 2`
+```text
++----------------------+-------------+----------------------+
+| ID                   | TITLE       | CREATED              |
++----------------------+-------------+----------------------+
+| 7n3x0y4q9k2m1a8      | hello       | 2026-02-28T08:12:00Z |
+| 0s9d2k1f4m8q7w3      | release     | 2026-02-27T11:03:42Z |
++----------------------+-------------+----------------------+
+2 rows
+page=1 perPage=2 totalItems=24 totalPages=12
+```
+
+예시 C) `pbmulti api records --db dev --superuser root --collection posts --format csv --out ./posts.csv`
+```text
+Exported 24 rows to ./posts.csv (format=csv)
+```
+
+### 9.10 오류 출력 예시 (`stderr`)
+
+예시 A) 없는 db 별칭 (exit code `2`)
+```text
+Error: Could not find a saved db named "staging2".
+Hint: Run `pbmulti db list` to see available db aliases.
+```
+
+예시 B) 없는 superuser 별칭 (exit code `2`)
+```text
+Error: Superuser alias "root2" is not configured for db "dev".
+Hint: Run `pbmulti superuser list --db dev` to see available aliases.
+```
+
+예시 C) 읽기 전용 위반 (exit code `2`)
+```text
+Error: This CLI is read-only for PocketBase API operations.
+Hint: Only GET requests are supported.
+```
+
+예시 D) 인자 조합 오류 (exit code `2`)
+```text
+Error: Missing required option `--out` when `--format` is `csv` or `markdown`.
+Hint: Example: --format csv --out ./records.csv
+```
+
+예시 E) 인증 실패 (exit code `3`)
+```text
+Error: Authentication failed for superuser "root" on db "dev".
+Hint: Verify the saved credentials for this superuser alias.
+```
+
+예시 F) 파일 쓰기 실패 (exit code `1`)
+```text
+Error: Could not write output file "./posts.csv".
+Hint: Check directory existence and write permission.
+```
+
+### 9.11 종료 코드 매핑
+- `0`: 성공
+- `1`: 로컬 런타임 실패(파일 I/O 등)
+- `2`: 인자 오류/모드 충돌/미지원 기능/계약 위반
+- `3`: 외부 의존 실패(PocketBase 네트워크/인증/API 오류)
