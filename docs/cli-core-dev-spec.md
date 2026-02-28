@@ -103,3 +103,71 @@ Track 2 시작 시 아래를 이관한다.
 
 Track 2 상세 기준은 `docs/ui-mode-dev-spec.md`를 따른다.
 
+## 9) CLI 인터페이스 계약 (PocketBase 조회 전용)
+
+### 9.1 용어
+- `db`: PocketBase 서버 접속 대상
+- `dbAlias`: `db` 식별 별칭
+- `superuser`: 특정 `db`에 접속할 PocketBase superuser 계정
+- `superuserAlias`: `superuser` 식별 별칭
+
+### 9.2 공통 계약
+- REPL / one-shot / script에서 동일 명령 문법을 사용한다.
+- PocketBase API 호출은 `GET`만 허용한다.
+- 생성/수정/삭제 요청은 미지원이다.
+- 성공 결과는 `stdout`, 오류는 `stderr`에 출력한다.
+- 오류 출력은 아래 형식을 따른다.
+  - 1행: `Error: <plain English message>`
+  - 2행(선택): `Hint: <next action>`
+- 자동화/스크립트는 오류 문구 파싱이 아니라 종료 코드(`0/1/2/3`)를 기준으로 처리해야 한다.
+
+### 9.3 실행 문법
+- one-shot: `pbmulti -c "<command>"`
+- script: `pbmulti <script-file>`
+- REPL: `pbmulti` 실행 후 명령 입력
+- REPL 내부에서는 `pbmulti` 접두사 없이 동일 서브커맨드를 사용한다.
+  - 예: one-shot `pbmulti -c "db list"` == REPL `db list`
+
+### 9.4 db 관리 명령
+- `pbmulti db add --alias <dbAlias> --url <baseUrl>`
+- `pbmulti db list`
+- `pbmulti db remove --alias <dbAlias>`
+
+검증 규칙:
+- `dbAlias`는 대소문자 무시 기준 고유값이다.
+- `baseUrl`은 유효한 `http://` 또는 `https://` URL이어야 한다.
+
+### 9.5 superuser 관리 명령
+- `pbmulti superuser add --db <dbAlias> --alias <superuserAlias> --email <email> --password <password>`
+- `pbmulti superuser list --db <dbAlias>`
+- `pbmulti superuser remove --db <dbAlias> --alias <superuserAlias>`
+
+검증 규칙:
+- superuser는 반드시 하나의 `db`에 종속된다.
+- 동일 `db` 내 `superuserAlias`는 고유값이다.
+
+### 9.6 Collection 조회 명령
+- `pbmulti api collections --db <dbAlias> --superuser <superuserAlias> [--format <table|csv|markdown>] [--out <path>]`
+- `pbmulti api collection --db <dbAlias> --superuser <superuserAlias> --name <collectionName> [--format <table|csv|markdown>] [--out <path>]`
+
+### 9.7 Record 조회 명령
+- `pbmulti api records --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> [--page <n>] [--per-page <n>] [--sort <expr>] [--filter <expr>] [--format <table|csv|markdown>] [--out <path>]`
+- `pbmulti api record --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> --id <recordId> [--format <table|csv|markdown>] [--out <path>]`
+
+쿼리 규칙:
+- `--page`, `--per-page`, `--sort`, `--filter`는 PocketBase 공식 규칙을 따른다.
+- 잘못된 인자/쿼리 값은 종료 코드 `2`를 반환한다.
+
+### 9.8 출력 포맷 계약
+- 기본 포맷은 `table`이다.
+- `--format table`
+  - `stdout`에 ASCII 테이블 출력
+  - `--out` 사용 불가
+- `--format csv|markdown`
+  - `--out <path>` 필수
+  - 지정 파일에 결과 저장
+  - `stdout`에는 저장 요약 1줄 출력
+- 다건 조회 시 아래 메타 정보를 마지막 줄에 출력한다.
+  - `page`, `perPage`, `totalItems`, `totalPages`
+- 결과가 없으면 빈 테이블과 `0 rows`를 출력한다.
+
