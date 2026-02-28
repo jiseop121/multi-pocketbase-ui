@@ -15,7 +15,7 @@ const Version = "0.1.0"
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	cfg, err := ParseRunConfig(args, stdin, stdout, stderr)
 	if err != nil {
-		writeError(cfg.Stderr, err)
+		writeError(stderr, err)
 		return MapErrorToExitCode(err)
 	}
 

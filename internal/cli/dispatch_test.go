@@ -69,7 +69,7 @@ func TestAPIRecordsQueryOptionsAndMetaOutput(t *testing.T) {
 	if gotQuery.Get("sort") != "-created" {
 		t.Fatalf("missing sort query: %v", gotQuery)
 	}
-	if gotQuery.Get("filter") != "status=open" {
+	if gotQuery.Get("filter") != "status='open'" {
 		t.Fatalf("missing filter query: %v", gotQuery)
 	}
 	out := buf.String()

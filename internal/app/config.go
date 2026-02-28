@@ -2,6 +2,7 @@ package app
 
 import (
 	"io"
+	"strings"
 )
 
 type ExecMode string
@@ -32,7 +33,10 @@ func ParseRunConfig(args []string, stdin io.Reader, stdout, stderr io.Writer) (R
 			cfg.UIEnabled = true
 		case "-c":
 			if i+1 >= len(args) {
-				return RunConfig{}, NewInvalidArgsError("Missing command text for `-c`.", "Example: pbmulti -c \"version\"")
+				return cfg, NewInvalidArgsError("Missing command text for `-c`.", "Example: pbmulti -c \"version\"")
+			}
+			if strings.TrimSpace(args[i+1]) == "" {
+				return cfg, NewInvalidArgsError("Command text for `-c` cannot be empty.", "Example: pbmulti -c \"version\"")
 			}
 			cfg.CommandText = args[i+1]
 			i++
@@ -44,10 +48,10 @@ func ParseRunConfig(args []string, stdin io.Reader, stdout, stderr io.Writer) (R
 			}
 		default:
 			if len(arg) > 0 && arg[0] == '-' {
-				return RunConfig{}, NewInvalidArgsError("Unknown option `"+arg+"`.", "Run `pbmulti -c \"help\"` to see available commands.")
+				return cfg, NewInvalidArgsError("Unknown option `"+arg+"`.", "Run `pbmulti -c \"help\"` to see available commands.")
 			}
 			if cfg.ScriptPath != "" {
-				return RunConfig{}, NewInvalidArgsError("Only one script file path can be provided.", "Use: pbmulti <script-file>")
+				return cfg, NewInvalidArgsError("Only one script file path can be provided.", "Use: pbmulti <script-file>")
 			}
 			cfg.ScriptPath = arg
 		}

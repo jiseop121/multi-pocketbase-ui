@@ -19,6 +19,8 @@ func ParseCommandLine(line string) ([]string, error) {
 		inDouble     bool
 		escaped      bool
 		quoteStarted bool
+		keepSingle   bool
+		keepDouble   bool
 	)
 
 	flush := func(force bool) {
@@ -37,11 +39,35 @@ func ParseCommandLine(line string) ([]string, error) {
 		case r == '\\' && !inSingle:
 			escaped = true
 		case r == '\'' && !inDouble:
-			inSingle = !inSingle
+			if inSingle {
+				if keepSingle {
+					current = append(current, r)
+				}
+				inSingle = false
+				keepSingle = false
+				continue
+			}
+			inSingle = true
 			quoteStarted = true
+			if len(current) > 0 {
+				keepSingle = true
+				current = append(current, r)
+			}
 		case r == '"' && !inSingle:
-			inDouble = !inDouble
+			if inDouble {
+				if keepDouble {
+					current = append(current, r)
+				}
+				inDouble = false
+				keepDouble = false
+				continue
+			}
+			inDouble = true
 			quoteStarted = true
+			if len(current) > 0 {
+				keepDouble = true
+				current = append(current, r)
+			}
 		case unicode.IsSpace(r) && !inSingle && !inDouble:
 			flush(false)
 		default:

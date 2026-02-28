@@ -43,6 +43,40 @@ func TestRunStdoutStderrSeparation(t *testing.T) {
 	}
 }
 
+func TestRunParseErrorWritesToStderr(t *testing.T) {
+	stdin := bytes.NewBuffer(nil)
+	stdout := bytes.NewBuffer(nil)
+	stderr := bytes.NewBuffer(nil)
+
+	code := Run(context.Background(), []string{"--unknown"}, stdin, stdout, stderr)
+	if code != 2 {
+		t.Fatalf("exit code mismatch: got=%d want=2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected empty stdout")
+	}
+	if !strings.Contains(stderr.String(), "Unknown option `--unknown`.") {
+		t.Fatalf("missing parse error output: %s", stderr.String())
+	}
+}
+
+func TestRunEmptyOneShotCommandReturnsInvalidArgs(t *testing.T) {
+	stdin := bytes.NewBuffer(nil)
+	stdout := bytes.NewBuffer(nil)
+	stderr := bytes.NewBuffer(nil)
+
+	code := Run(context.Background(), []string{"-c", ""}, stdin, stdout, stderr)
+	if code != 2 {
+		t.Fatalf("exit code mismatch: got=%d want=2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected empty stdout")
+	}
+	if !strings.Contains(stderr.String(), "Command text for `-c` cannot be empty.") {
+		t.Fatalf("missing empty one-shot error output: %s", stderr.String())
+	}
+}
+
 func TestRunScriptFailFast(t *testing.T) {
 	tempDir := t.TempDir()
 	scriptPath := filepath.Join(tempDir, "script.txt")

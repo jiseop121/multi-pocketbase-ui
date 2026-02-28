@@ -14,6 +14,7 @@ func TestParseRunConfigModesAndConflicts(t *testing.T) {
 	}{
 		{name: "repl", args: []string{}, wantMode: ModeREPL},
 		{name: "one shot", args: []string{"-c", "version"}, wantMode: ModeOneShot},
+		{name: "one shot empty command text", args: []string{"-c", ""}, wantError: true},
 		{name: "script", args: []string{"script.txt"}, wantMode: ModeScript},
 		{name: "ui reserved", args: []string{"-ui"}, wantMode: ModeUIReserved},
 		{name: "conflict c and script", args: []string{"-c", "version", "script.txt"}, wantError: true},
