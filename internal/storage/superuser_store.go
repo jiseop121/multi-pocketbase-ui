@@ -1,8 +1,13 @@
 package storage
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,18 +15,23 @@ import (
 )
 
 type Superuser struct {
-	DBAlias  string `json:"dbAlias"`
-	Alias    string `json:"alias"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	DBAlias     string `json:"dbAlias"`
+	Alias       string `json:"alias"`
+	Email       string `json:"email"`
+	Password    string `json:"password,omitempty"`
+	PasswordEnc string `json:"passwordEnc,omitempty"`
 }
 
 type SuperuserStore struct {
-	path string
+	path    string
+	keyPath string
 }
 
 func NewSuperuserStore(dataDir string) *SuperuserStore {
-	return &SuperuserStore{path: filepath.Join(dataDir, "superusers.json")}
+	return &SuperuserStore{
+		path:    filepath.Join(dataDir, "superusers.json"),
+		keyPath: filepath.Join(dataDir, "superusers.key"),
+	}
 }
 
 func (s *SuperuserStore) Add(dbAlias, alias, email, password string) error {
@@ -39,7 +49,22 @@ func (s *SuperuserStore) Add(dbAlias, alias, email, password string) error {
 		}
 	}
 
-	items = append(items, Superuser{DBAlias: dbAlias, Alias: alias, Email: email, Password: password})
+	key, err := s.loadOrCreateKey()
+	if err != nil {
+		return err
+	}
+	encrypted, err := encryptPassword(key, password)
+	if err != nil {
+		return err
+	}
+
+	items = append(items, Superuser{
+		DBAlias:     dbAlias,
+		Alias:       alias,
+		Email:       email,
+		Password:    password,
+		PasswordEnc: encrypted,
+	})
 	return s.writeAll(items)
 }
 
@@ -108,6 +133,24 @@ func (s *SuperuserStore) readAll() ([]Superuser, error) {
 	if err := json.Unmarshal(data, &items); err != nil {
 		return nil, err
 	}
+	for i := range items {
+		switch {
+		case strings.TrimSpace(items[i].PasswordEnc) != "":
+			key, keyErr := s.loadOrCreateKey()
+			if keyErr != nil {
+				return nil, keyErr
+			}
+			password, decErr := decryptPassword(key, items[i].PasswordEnc)
+			if decErr != nil {
+				return nil, fmt.Errorf("decrypt superuser password for %q/%q: %w", items[i].DBAlias, items[i].Alias, decErr)
+			}
+			items[i].Password = password
+		case strings.TrimSpace(items[i].Password) != "":
+			// Legacy plaintext format. Keep compatibility and re-encrypt on next write.
+		default:
+			return nil, fmt.Errorf("superuser %q for db %q has no usable credential", items[i].Alias, items[i].DBAlias)
+		}
+	}
 	return items, nil
 }
 
@@ -115,9 +158,105 @@ func (s *SuperuserStore) writeAll(items []Superuser) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(items, "", "  ")
+	key, err := s.loadOrCreateKey()
+	if err != nil {
+		return err
+	}
+	persisted := make([]Superuser, 0, len(items))
+	for _, item := range items {
+		plain := strings.TrimSpace(item.Password)
+		cipherText := strings.TrimSpace(item.PasswordEnc)
+		if plain == "" && cipherText == "" {
+			return fmt.Errorf("superuser %q for db %q has no usable credential", item.Alias, item.DBAlias)
+		}
+		if plain != "" {
+			cipherText, err = encryptPassword(key, plain)
+			if err != nil {
+				return err
+			}
+		}
+		persisted = append(persisted, Superuser{
+			DBAlias:     item.DBAlias,
+			Alias:       item.Alias,
+			Email:       item.Email,
+			PasswordEnc: cipherText,
+		})
+	}
+
+	data, err := json.MarshalIndent(persisted, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(s.path, append(data, '\n'), 0o600)
+}
+
+func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
+	if data, err := os.ReadFile(s.keyPath); err == nil {
+		key, decErr := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data)))
+		if decErr != nil {
+			return nil, fmt.Errorf("invalid superuser key format: %w", decErr)
+		}
+		if len(key) != 32 {
+			return nil, fmt.Errorf("invalid superuser key length: %d", len(key))
+		}
+		return key, nil
+	} else if !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(s.keyPath), 0o755); err != nil {
+		return nil, err
+	}
+
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return nil, err
+	}
+	encoded := base64.StdEncoding.EncodeToString(key) + "\n"
+	if err := os.WriteFile(s.keyPath, []byte(encoded), 0o600); err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
+func encryptPassword(key []byte, plain string) (string, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	ciphertext := gcm.Seal(nil, nonce, []byte(plain), nil)
+	blob := append(nonce, ciphertext...)
+	return base64.StdEncoding.EncodeToString(blob), nil
+}
+
+func decryptPassword(key []byte, encoded string) (string, error) {
+	blob, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	if len(blob) < gcm.NonceSize() {
+		return "", fmt.Errorf("ciphertext too short")
+	}
+	nonce, ciphertext := blob[:gcm.NonceSize()], blob[gcm.NonceSize():]
+	plain, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
 }

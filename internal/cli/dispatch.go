@@ -212,7 +212,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if err := fs.Parse(args[1:]); err != nil {
 			return invalidFlagError(err)
 		}
-		if err := validateOutputOptions(*format, *out); err != nil {
+		if _, err := validateOutputOptions(*format, *out); err != nil {
 			return err
 		}
 		target, err := d.resolveTarget(*dbAlias, *suAlias)
@@ -243,7 +243,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if *name == "" {
 			return apperr.Invalid("Missing required option `--name`.", "Example: api collection --name posts")
 		}
-		if err := validateOutputOptions(*format, *out); err != nil {
+		if _, err := validateOutputOptions(*format, *out); err != nil {
 			return err
 		}
 		target, err := d.resolveTarget(*dbAlias, *suAlias)
@@ -278,7 +278,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if *collection == "" {
 			return apperr.Invalid("Missing required option `--collection`.", "Example: api records --collection posts")
 		}
-		if err := validateOutputOptions(*format, *out); err != nil {
+		if _, err := validateOutputOptions(*format, *out); err != nil {
 			return err
 		}
 		query := map[string]string{}
@@ -329,7 +329,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if *collection == "" || *recordID == "" {
 			return apperr.Invalid("Missing required options `--collection` and `--id`.", "Example: api record --collection posts --id rec123")
 		}
-		if err := validateOutputOptions(*format, *out); err != nil {
+		if _, err := validateOutputOptions(*format, *out); err != nil {
 			return err
 		}
 		target, err := d.resolveTarget(*dbAlias, *suAlias)
@@ -445,20 +445,6 @@ func positiveInt(s string) (int, error) {
 		return 0, fmt.Errorf("must be positive")
 	}
 	return v, nil
-}
-
-func validateOutputOptions(format, out string) error {
-	normalized, err := pocketbase.ValidateFormat(format)
-	if err != nil {
-		return apperr.Invalid("Unsupported output format.", "Use one of: table, csv, markdown.")
-	}
-	if normalized == "table" && strings.TrimSpace(out) != "" {
-		return apperr.Invalid("`--out` cannot be used when `--format` is `table`.", "Remove `--out` or switch to `csv`/`markdown`.")
-	}
-	if (normalized == "csv" || normalized == "markdown") && strings.TrimSpace(out) == "" {
-		return apperr.Invalid("Missing required option `--out` when `--format` is `csv` or `markdown`.", "Example: --format csv --out ./records.csv")
-	}
-	return nil
 }
 
 func (d *Dispatcher) printHelp() {

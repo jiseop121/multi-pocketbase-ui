@@ -13,15 +13,9 @@ import (
 )
 
 func RenderQueryResult(format, outPath string, result pocketbase.QueryResult) (string, error) {
-	normalized, err := pocketbase.ValidateFormat(format)
+	normalized, err := validateOutputOptions(format, outPath)
 	if err != nil {
-		return "", apperr.Invalid("Unsupported output format.", "Use one of: table, csv, markdown.")
-	}
-	if normalized == "table" && strings.TrimSpace(outPath) != "" {
-		return "", apperr.Invalid("`--out` cannot be used when `--format` is `table`.", "Remove `--out` or switch to `csv`/`markdown`.")
-	}
-	if (normalized == "csv" || normalized == "markdown") && strings.TrimSpace(outPath) == "" {
-		return "", apperr.Invalid("Missing required option `--out` when `--format` is `csv` or `markdown`.", "Example: --format csv --out ./records.csv")
+		return "", err
 	}
 
 	columns := pocketbase.CollectColumns(result.Rows)
@@ -52,6 +46,20 @@ func RenderQueryResult(format, outPath string, result pocketbase.QueryResult) (s
 func RenderTableRows(rows []map[string]any) string {
 	cols := pocketbase.CollectColumns(rows)
 	return renderTable(cols, rows)
+}
+
+func validateOutputOptions(format, out string) (string, error) {
+	normalized, err := pocketbase.ValidateFormat(format)
+	if err != nil {
+		return "", apperr.Invalid("Unsupported output format.", "Use one of: table, csv, markdown.")
+	}
+	if normalized == "table" && strings.TrimSpace(out) != "" {
+		return "", apperr.Invalid("`--out` cannot be used when `--format` is `table`.", "Remove `--out` or switch to `csv`/`markdown`.")
+	}
+	if (normalized == "csv" || normalized == "markdown") && strings.TrimSpace(out) == "" {
+		return "", apperr.Invalid("Missing required option `--out` when `--format` is `csv` or `markdown`.", "Example: --format csv --out ./records.csv")
+	}
+	return normalized, nil
 }
 
 func renderTable(columns []string, rows []map[string]any) string {

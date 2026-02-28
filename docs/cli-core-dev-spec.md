@@ -145,6 +145,7 @@ Track 2 상세 기준은 `docs/ui-mode-dev-spec.md`를 따른다.
 검증 규칙:
 - superuser는 반드시 하나의 `db`에 종속된다.
 - 동일 `db` 내 `superuserAlias`는 고유값이다.
+- superuser 비밀번호는 로컬 파일에 평문으로 저장하지 않고 암호화(`passwordEnc`)해 저장한다.
 
 ### 9.6 Collection 조회 명령
 - `pbmulti api collections --db <dbAlias> --superuser <superuserAlias> [--format <table|csv|markdown>] [--out <path>]`

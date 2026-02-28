@@ -2,6 +2,7 @@ package pocketbase
 
 import (
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -35,15 +36,15 @@ func BuildCollectionsEndpoint() string {
 }
 
 func BuildCollectionEndpoint(name string) string {
-	return fmt.Sprintf("/api/collections/%s", name)
+	return fmt.Sprintf("/api/collections/%s", url.PathEscape(name))
 }
 
 func BuildRecordsEndpoint(collection string) string {
-	return fmt.Sprintf("/api/collections/%s/records", collection)
+	return fmt.Sprintf("/api/collections/%s/records", url.PathEscape(collection))
 }
 
 func BuildRecordEndpoint(collection, id string) string {
-	return fmt.Sprintf("/api/collections/%s/records/%s", collection, id)
+	return fmt.Sprintf("/api/collections/%s/records/%s", url.PathEscape(collection), url.PathEscape(id))
 }
 
 func ValidateFormat(format string) (string, error) {
@@ -132,25 +133,28 @@ func CollectColumns(rows []map[string]any) []string {
 		cols = append(cols, k)
 	}
 	sort.Slice(cols, func(i, j int) bool {
-		if cols[i] == "id" {
-			return true
-		}
-		if cols[j] == "id" {
+		if cols[i] == cols[j] {
 			return false
 		}
-		if cols[i] == "title" {
-			return true
-		}
-		if cols[j] == "title" {
-			return false
-		}
-		if cols[i] == "created" {
-			return true
-		}
-		if cols[j] == "created" {
-			return false
+		pi := columnPriority(cols[i])
+		pj := columnPriority(cols[j])
+		if pi != pj {
+			return pi < pj
 		}
 		return cols[i] < cols[j]
 	})
 	return cols
+}
+
+func columnPriority(col string) int {
+	switch col {
+	case "id":
+		return 0
+	case "title":
+		return 1
+	case "created":
+		return 2
+	default:
+		return 3
+	}
 }
