@@ -6,10 +6,10 @@ class PocketbaseMultiview < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/jiseop121/multi-pocketbase-ui/releases/download/v0.2.1/pbmulti-v0.2.1-darwin-arm64.tar.gz"
-      sha256 "01187c55efda1f189fa8d467405cc5c8bbb9a99a3966a0d486ece1af9059f400"
+      sha256 "60d412ef660e931f7910a95a62e9422279bd279b0d8f9d2e58e1d213e43b19b9"
     else
       url "https://github.com/jiseop121/multi-pocketbase-ui/releases/download/v0.2.1/pbmulti-v0.2.1-darwin-amd64.tar.gz"
-      sha256 "a5919c72a2047239e5d3a5594e2b15ea2085c2c0b6d81567315e84a38003db72"
+      sha256 "230cfd17739ade43085c969e6a8a66b478eebd994ac4649cf5c35e8e83dab3ec"
     end
   end
 
