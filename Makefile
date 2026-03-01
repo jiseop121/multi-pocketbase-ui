@@ -5,7 +5,7 @@ PB_WORKDIR ?= .tmp/pocketbase-dev
 PB_SUPERUSER_EMAIL ?= root@example.com
 PB_SUPERUSER_PASSWORD ?= pass123456
 
-.PHONY: test e2e pocketbase-superuser pocketbase-serve
+.PHONY: test e2e pocketbase-superuser pocketbase-serve release-tag
 
 test:
 	$(GO) test ./...
@@ -20,3 +20,8 @@ pocketbase-superuser:
 pocketbase-serve:
 	mkdir -p $(PB_WORKDIR)
 	cd $(PB_WORKDIR) && $(POCKETBASE_BIN) serve --http=$(PB_HTTP)
+
+release-tag:
+	@if [ -z "$(VERSION)" ]; then echo "VERSION is required. Example: make release-tag VERSION=0.2.1"; exit 1; fi
+	@if ! echo "$(VERSION)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then echo "VERSION must be semantic version without v prefix (e.g. 0.2.1)"; exit 1; fi
+	./scripts/release_tag.sh "$(VERSION)"

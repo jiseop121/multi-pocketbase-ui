@@ -74,6 +74,19 @@ pbmulti -c "api records --db local --superuser root --collection posts --page 1 
 pbmulti -c "api records --db local --superuser root --collection posts --format csv --out ./posts.csv"
 ```
 
+## Release 자동화
+
+태그를 푸시하면 GitHub Release 본문은 자동 생성된다.
+
+```bash
+make release-tag VERSION=0.2.1
+```
+
+동작:
+- `go test ./...` 실행
+- `v0.2.1` 태그 생성 및 원격 푸시
+- GitHub Actions(`.github/workflows/release.yml`)가 Release를 생성/갱신하고 변경사항 노트를 자동 작성
+
 ## 추가 문서
 
 - 개발/테스트 가이드: `docs/development-guide.md`
