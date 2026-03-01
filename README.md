@@ -7,14 +7,14 @@
 ### Homebrew (공식)
 
 ```bash
-brew tap jiseop121/pocketbase-multiview
-brew install pocketbase-multiview
+brew tap jiseop121/multi-pocketbase-ui
+brew install jiseop121/multi-pocketbase-ui/pocketbase-multiview
 ```
 
-선택적으로 formula 전체 경로로도 설치할 수 있습니다.
+또는 formula URL 직접 설치:
 
 ```bash
-brew install jiseop121/pocketbase-multiview/pocketbase-multiview
+brew install --formula https://raw.githubusercontent.com/jiseop121/multi-pocketbase-ui/main/Formula/pocketbase-multiview.rb
 ```
 
 ### 소스에서 설치 (보조)
@@ -87,9 +87,19 @@ make release-tag VERSION=0.2.1
 - `v0.2.1` 태그 생성 및 원격 푸시
 - GitHub Actions(`.github/workflows/release.yml`)가 Release를 생성/갱신하고 변경사항 노트를 자동 작성
 
-## 추가 문서
+Homebrew 배포 파일(아티팩트 + Formula) 갱신:
 
-- 개발/테스트 가이드: `docs/development-guide.md`
-- 문서 권한/우선순위: `docs/docs-index.md`
-- CLI 계약(Track 1): `docs/cli-core-dev-spec.md`
-- UI 모드 계약(Track 2): `docs/ui-mode-dev-spec.md`
+```bash
+make release-brew VERSION=0.2.1
+```
+
+동작:
+- `darwin-arm64`, `darwin-amd64` 바이너리 tar.gz 빌드
+- 현재 레포 Release(`v0.2.1`)에 아티팩트 업로드
+- `Formula/pocketbase-multiview.rb` SHA/URL 갱신 후 커밋/푸시
+- Homebrew 설치 스모크 테스트
+
+## 참고
+
+- 버그/제안은 GitHub Issues로 등록
+- 보안 이슈는 공개 이슈 대신 비공개 채널로 제보 권장

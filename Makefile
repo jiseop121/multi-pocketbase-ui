@@ -5,7 +5,7 @@ PB_WORKDIR ?= .tmp/pocketbase-dev
 PB_SUPERUSER_EMAIL ?= root@example.com
 PB_SUPERUSER_PASSWORD ?= pass123456
 
-.PHONY: test e2e pocketbase-superuser pocketbase-serve release-tag
+.PHONY: test e2e pocketbase-superuser pocketbase-serve release-tag release-brew
 
 test:
 	$(GO) test ./...
@@ -25,3 +25,7 @@ release-tag:
 	@if [ -z "$(VERSION)" ]; then echo "VERSION is required. Example: make release-tag VERSION=0.2.1"; exit 1; fi
 	@if ! echo "$(VERSION)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then echo "VERSION must be semantic version without v prefix (e.g. 0.2.1)"; exit 1; fi
 	./scripts/release_tag.sh "$(VERSION)"
+
+release-brew:
+	@if [ -z "$(VERSION)" ]; then echo "VERSION is required. Example: make release-brew VERSION=0.2.1"; exit 1; fi
+	./scripts/release_brew_single_repo.sh --version "$(VERSION)" --github-repo "jiseop121/multi-pocketbase-ui"
