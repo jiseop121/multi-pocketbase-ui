@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -39,5 +41,23 @@ func TestRenderQueryResultEmptyTableShowsZeroRows(t *testing.T) {
 	}
 	if !strings.Contains(out, "0 rows") {
 		t.Fatalf("expected zero rows output: %s", out)
+	}
+}
+
+func TestRenderQueryResultEmptyCSVUsesFallbackHeader(t *testing.T) {
+	outPath := filepath.Join(t.TempDir(), "empty.csv")
+	msg, err := RenderQueryResult("csv", outPath, pocketbase.QueryResult{Rows: []map[string]any{}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(msg, "Exported 0 rows") {
+		t.Fatalf("unexpected export summary: %s", msg)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if !strings.HasPrefix(string(data), "result") {
+		t.Fatalf("missing fallback header in csv: %q", string(data))
 	}
 }

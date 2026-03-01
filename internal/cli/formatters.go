@@ -118,6 +118,9 @@ func renderTable(columns []string, rows []map[string]any) string {
 }
 
 func renderCSV(columns []string, rows []map[string]any) (string, error) {
+	if len(columns) == 0 {
+		columns = []string{"result"}
+	}
 	buf := &bytes.Buffer{}
 	writer := csv.NewWriter(buf)
 	if err := writer.Write(columns); err != nil {

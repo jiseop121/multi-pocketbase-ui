@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,5 +73,44 @@ func TestSuperuserStoreMigratesLegacyPlaintextOnWrite(t *testing.T) {
 	}
 	if strings.Contains(text, `"password"`) {
 		t.Fatalf("legacy password field should be removed after write: %s", text)
+	}
+}
+
+func TestSuperuserStoreUsesEnvKeyWithoutPersistingKeyFile(t *testing.T) {
+	key := strings.Repeat("k", 32)
+	encoded := base64.StdEncoding.EncodeToString([]byte(key))
+	t.Setenv("PBMULTI_SUPERUSER_KEY_B64", encoded)
+
+	dir := t.TempDir()
+	store := NewSuperuserStore(dir)
+	if err := store.Add("dev", "root", "root@example.com", "pw123456"); err != nil {
+		t.Fatalf("add superuser: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "superusers.key")); !os.IsNotExist(err) {
+		t.Fatalf("key file should not be created when env key is set: %v", err)
+	}
+
+	got, ok, err := store.Find("dev", "root")
+	if err != nil {
+		t.Fatalf("find superuser: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected superuser to be found")
+	}
+	if got.Password != "pw123456" {
+		t.Fatalf("decrypted password mismatch: got=%q", got.Password)
+	}
+}
+
+func TestSuperuserStoreRejectsInvalidEnvKey(t *testing.T) {
+	t.Setenv("PBMULTI_SUPERUSER_KEY_B64", "invalid")
+	store := NewSuperuserStore(t.TempDir())
+	err := store.Add("dev", "root", "root@example.com", "pw123456")
+	if err == nil {
+		t.Fatalf("expected error for invalid env key")
+	}
+	if !strings.Contains(err.Error(), "PBMULTI_SUPERUSER_KEY_B64") {
+		t.Fatalf("missing env key context: %v", err)
 	}
 }

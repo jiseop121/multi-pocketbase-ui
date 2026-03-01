@@ -168,6 +168,6 @@ func joinURL(baseURL, endpoint string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	base.Path = path.Join(base.Path, endpoint)
+	base.Path = path.Join(base.Path, strings.TrimPrefix(endpoint, "/"))
 	return base.String(), nil
 }

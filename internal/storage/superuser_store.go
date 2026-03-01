@@ -27,6 +27,8 @@ type SuperuserStore struct {
 	keyPath string
 }
 
+const superuserKeyEnv = "PBMULTI_SUPERUSER_KEY_B64"
+
 func NewSuperuserStore(dataDir string) *SuperuserStore {
 	return &SuperuserStore{
 		path:    filepath.Join(dataDir, "superusers.json"),
@@ -133,13 +135,26 @@ func (s *SuperuserStore) readAll() ([]Superuser, error) {
 	if err := json.Unmarshal(data, &items); err != nil {
 		return nil, err
 	}
+
+	needsDecryption := false
+	for i := range items {
+		if strings.TrimSpace(items[i].PasswordEnc) != "" {
+			needsDecryption = true
+			break
+		}
+	}
+
+	var key []byte
+	if needsDecryption {
+		key, err = s.loadOrCreateKey()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for i := range items {
 		switch {
 		case strings.TrimSpace(items[i].PasswordEnc) != "":
-			key, keyErr := s.loadOrCreateKey()
-			if keyErr != nil {
-				return nil, keyErr
-			}
 			password, decErr := decryptPassword(key, items[i].PasswordEnc)
 			if decErr != nil {
 				return nil, fmt.Errorf("decrypt superuser password for %q/%q: %w", items[i].DBAlias, items[i].Alias, decErr)
@@ -191,13 +206,18 @@ func (s *SuperuserStore) writeAll(items []Superuser) error {
 }
 
 func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
-	if data, err := os.ReadFile(s.keyPath); err == nil {
-		key, decErr := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data)))
-		if decErr != nil {
-			return nil, fmt.Errorf("invalid superuser key format: %w", decErr)
+	if envKey := strings.TrimSpace(os.Getenv(superuserKeyEnv)); envKey != "" {
+		key, err := decodeStoredKey(envKey)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s: %w", superuserKeyEnv, err)
 		}
-		if len(key) != 32 {
-			return nil, fmt.Errorf("invalid superuser key length: %d", len(key))
+		return key, nil
+	}
+
+	if data, err := os.ReadFile(s.keyPath); err == nil {
+		key, decErr := decodeStoredKey(string(data))
+		if decErr != nil {
+			return nil, fmt.Errorf("invalid superuser key file: %w", decErr)
 		}
 		return key, nil
 	} else if !os.IsNotExist(err) {
@@ -215,6 +235,17 @@ func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
 	encoded := base64.StdEncoding.EncodeToString(key) + "\n"
 	if err := os.WriteFile(s.keyPath, []byte(encoded), 0o600); err != nil {
 		return nil, err
+	}
+	return key, nil
+}
+
+func decodeStoredKey(raw string) ([]byte, error) {
+	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(raw))
+	if err != nil {
+		return nil, fmt.Errorf("base64 decode failed: %w", err)
+	}
+	if len(key) != 32 {
+		return nil, fmt.Errorf("invalid key length: %d", len(key))
 	}
 	return key, nil
 }

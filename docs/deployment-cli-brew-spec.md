@@ -22,7 +22,7 @@
 아래 계약은 두 트랙에서 공통으로 유지한다.
 
 - 바이너리 이름: `pbmulti`
-- 오류 형식: `ERR_CODE: message`
+- 오류 형식: `Error: <plain English message>` + 선택적 `Hint: <next action>`
 - 출력 분리: 성공 `stdout`, 오류 `stderr`
 - 종료 코드:
 - `0` 성공
@@ -35,7 +35,7 @@
 ### 3.1 Track 1 단계
 
 - 내부/사전 릴리스는 가능
-- `-ui`는 `ERR_UI_NOT_READY` 응답이 정상 동작
+- Track 1에서 `pbmulti -ui` 실행 시 `Error: UI mode is not available in Track 1.` 출력 후 종료 코드 `2`를 반환한다
 - Homebrew 공개 배포는 선택 사항(팀 정책에 따름)
 
 ### 3.2 Track 2 완료 후
