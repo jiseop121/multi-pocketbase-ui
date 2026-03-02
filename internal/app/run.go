@@ -11,7 +11,7 @@ import (
 	"multi-pocketbase-ui/internal/cli"
 )
 
-const Version = "0.2.2"
+const Version = "0.3.0"
 
 type modeResult struct {
 	err             error

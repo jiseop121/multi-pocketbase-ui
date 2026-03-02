@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-02
+
+### Added
+- Added interactive REPL line editing with tab completion and command history.
+- Added `context` commands (`show`, `use`, `save`, `clear`, `unsave`) to reuse db/superuser targets.
+- Added full-screen `api records` TUI view with keyboard navigation and detail panel.
+
+### Changed
+- Added `api records --view auto|tui|table` and made `auto` prefer TUI in interactive REPL TTY mode.
+- Added filter/sort/column selection interactions inside TUI with server-side re-query.
+- Added per-target auth token cache and one-time re-auth retry on 401 responses.
+- Increased source-build baseline to Go 1.25+.
+
 ## [0.2.2] - 2026-03-02
 
 ### Changed
