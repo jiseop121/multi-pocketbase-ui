@@ -87,6 +87,19 @@ func (s *SuperuserStore) ListByDB(dbAlias string) ([]Superuser, error) {
 	return filtered, nil
 }
 
+func (s *SuperuserStore) List() ([]Superuser, error) {
+	items, err := s.readAll()
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(items, func(i, j int) bool {
+		left := strings.ToLower(items[i].DBAlias + "/" + items[i].Alias)
+		right := strings.ToLower(items[j].DBAlias + "/" + items[j].Alias)
+		return left < right
+	})
+	return items, nil
+}
+
 func (s *SuperuserStore) Remove(dbAlias, alias string) error {
 	items, err := s.readAll()
 	if err != nil {
