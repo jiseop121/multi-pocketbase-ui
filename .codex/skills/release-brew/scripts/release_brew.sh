@@ -54,7 +54,7 @@ SOURCE_REPO_DIR=""
 TAP_REPO_DIR=""
 TAP_GITHUB_REPO=""
 FORMULA_NAME="pocketbase-multiview"
-BINARY_NAME="pbmulti"
+BINARY_NAME="pbviewer"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -132,8 +132,8 @@ ARTIFACT_AMD64="${BINARY_NAME}-v${VERSION}-darwin-amd64.tar.gz"
 echo "==> build binaries"
 (
   cd "$SOURCE_REPO_DIR"
-  GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o "$WORKDIR/arm64/${BINARY_NAME}" ./cmd/pbmulti
-  GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o "$WORKDIR/amd64/${BINARY_NAME}" ./cmd/pbmulti
+  GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o "$WORKDIR/arm64/${BINARY_NAME}" ./cmd/pbviewer
+  GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o "$WORKDIR/amd64/${BINARY_NAME}" ./cmd/pbviewer
 )
 
 (

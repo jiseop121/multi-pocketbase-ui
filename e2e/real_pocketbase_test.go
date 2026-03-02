@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-func TestPBMultiRealPocketBaseSmoke(t *testing.T) {
+func TestPBViewerRealPocketBaseSmoke(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skip e2e test in short mode")
 	}
@@ -66,14 +66,14 @@ func TestPBMultiRealPocketBaseSmoke(t *testing.T) {
 		t.Fatalf("pocketbase startup failed: %v\nlogs:\n%s", err, serveLogs.String())
 	}
 
-	pbmultiBin := filepath.Join(workDir, "pbmulti")
-	_ = runCommand(t, repoRoot, nil, "go", "build", "-o", pbmultiBin, "./cmd/pbmulti")
+	pbviewerBin := filepath.Join(workDir, "pbviewer")
+	_ = runCommand(t, repoRoot, nil, "go", "build", "-o", pbviewerBin, "./cmd/pbviewer")
 
-	pbmultiHome := filepath.Join(workDir, "pbmulti-home")
-	env := append(os.Environ(), "PBMULTI_HOME="+pbmultiHome)
+	pbviewerHome := filepath.Join(workDir, "pbviewer-home")
+	env := append(os.Environ(), "PBVIEWER_HOME="+pbviewerHome)
 
 	runCLI := func(line string) string {
-		return runCommand(t, repoRoot, env, pbmultiBin, "-c", line)
+		return runCommand(t, repoRoot, env, pbviewerBin, "-c", line)
 	}
 
 	versionOut := strings.TrimSpace(runCLI("version"))
@@ -133,7 +133,7 @@ func TestPBMultiRealPocketBaseSmoke(t *testing.T) {
 	if err := os.WriteFile(scriptPath, []byte(scriptBody), 0o644); err != nil {
 		t.Fatalf("write script file: %v", err)
 	}
-	scriptOut := runCommand(t, repoRoot, env, pbmultiBin, scriptPath)
+	scriptOut := runCommand(t, repoRoot, env, pbviewerBin, scriptPath)
 	if !strings.Contains(scriptOut, versionOut) || !strings.Contains(scriptOut, "local") {
 		t.Fatalf("script mode output mismatch: %q", scriptOut)
 	}

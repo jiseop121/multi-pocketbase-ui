@@ -1,13 +1,13 @@
 ---
 name: release-brew
-description: Build and publish macOS Homebrew release artifacts for pbmulti, update the tap formula, and verify installation. Use when users ask to release a new version, refresh formula SHA/URL, fix Homebrew distribution, or run end-to-end brew delivery checks.
+description: Build and publish macOS Homebrew release artifacts for pbviewer, update the tap formula, and verify installation. Use when users ask to release a new version, refresh formula SHA/URL, fix Homebrew distribution, or run end-to-end brew delivery checks.
 ---
 
 # Release Brew
 
 ## Overview
 
-Use this skill to execute a deterministic Homebrew release flow for `pbmulti`.
+Use this skill to execute a deterministic Homebrew release flow for `pbviewer`.
 Prefer the bundled script so versioning, artifact naming, SHA updates, and brew install checks stay consistent.
 
 ## Workflow

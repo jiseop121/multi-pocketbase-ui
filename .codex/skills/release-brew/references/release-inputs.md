@@ -10,7 +10,7 @@
 ## Defaults
 
 - formula name: `pocketbase-multiview`
-- binary name: `pbmulti`
+- binary name: `pbviewer`
 
 ## Expected outputs
 

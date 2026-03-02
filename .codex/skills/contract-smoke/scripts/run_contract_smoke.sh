@@ -43,10 +43,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-BIN="$WORKDIR/pbmulti"
+BIN="$WORKDIR/pbviewer"
 (
   cd "$REPO_DIR"
-  go build -o "$BIN" ./cmd/pbmulti
+  go build -o "$BIN" ./cmd/pbviewer
 )
 
 EXPECTED_VERSION="$(awk -F'"' '/const Version = / {print $2; exit}' "$REPO_DIR/internal/app/run.go")"

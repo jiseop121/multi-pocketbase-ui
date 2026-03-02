@@ -20,7 +20,7 @@ func RunREPL(ctx context.Context, stdin io.Reader, stdout io.Writer, execute fun
 		default:
 		}
 
-		if _, err := fmt.Fprint(stdout, "pbmulti> "); err != nil {
+		if _, err := fmt.Fprint(stdout, "pbviewer> "); err != nil {
 			return err
 		}
 		if !scanner.Scan() {

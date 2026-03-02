@@ -29,7 +29,7 @@ to_formula_class() {
 VERSION=""
 GITHUB_REPO=""
 FORMULA_NAME="pocketbase-multiview"
-BINARY_NAME="pbmulti"
+BINARY_NAME="pbviewer"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -105,8 +105,8 @@ ARTIFACT_AMD64="${BINARY_NAME}-v${VERSION}-darwin-amd64.tar.gz"
 
 echo "==> build binaries"
 BUILD_FLAGS=(-trimpath -ldflags "-s -w -buildid=")
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/arm64/${BINARY_NAME}" ./cmd/pbmulti
-GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/amd64/${BINARY_NAME}" ./cmd/pbmulti
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/arm64/${BINARY_NAME}" ./cmd/pbviewer
+GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/amd64/${BINARY_NAME}" ./cmd/pbviewer
 touch -t 197001010000 "$WORKDIR/arm64/${BINARY_NAME}" "$WORKDIR/amd64/${BINARY_NAME}"
 
 (

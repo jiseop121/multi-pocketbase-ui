@@ -1,6 +1,6 @@
 ---
 name: contract-smoke
-description: Verify CLI contract behavior (exit codes, stdout/stderr separation, and key error messages) for pbmulti with deterministic smoke checks. Use when users ask for regression checks after CLI changes, before release, or after bug fixes in command parsing and mode handling.
+description: Verify CLI contract behavior (exit codes, stdout/stderr separation, and key error messages) for pbviewer with deterministic smoke checks. Use when users ask for regression checks after CLI changes, before release, or after bug fixes in command parsing and mode handling.
 ---
 
 # Contract Smoke

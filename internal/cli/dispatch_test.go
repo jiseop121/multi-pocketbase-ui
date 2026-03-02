@@ -122,7 +122,7 @@ func TestHelpIncludesCommandDescriptions(t *testing.T) {
 
 	out := buf.String()
 	required := []string{
-		"pbmulti command reference",
+		"pbviewer command reference",
 		"Run modes:",
 		"Core commands:",
 		"DB commands:",
