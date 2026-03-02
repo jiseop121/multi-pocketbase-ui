@@ -13,7 +13,7 @@ brew install jiseop121/pocketbase-multiview/pocketbase-multiview
 
 ### 소스에서 설치 (보조)
 
-사전 조건: Go 1.23+
+사전 조건: Go 1.25+
 
 ```bash
 go build -o pbviewer ./cmd/pbviewer
@@ -57,7 +57,16 @@ pbviewer -c "api collections --db local --superuser root"
 pbviewer -c "api records --db local --superuser root --collection posts --page 1 --per-page 20"
 ```
 
-### 5) REPL/script 에러 처리 규칙
+### 5) REPL 기본 컨텍스트 설정
+
+```bash
+pbviewer
+pbviewer> context use --db local --superuser root
+pbviewer> context save
+pbviewer> api records --collection posts
+```
+
+### 6) REPL/script 에러 처리 규칙
 
 - `pbviewer`(REPL)와 `pbviewer <script-file>`는 명령 오류가 나도 다음 명령 실행을 계속합니다.
 - 세션 종료 코드는 마지막 오류 코드(`1/2/3`)를 따르며, 오류가 없으면 `0`입니다.
@@ -66,6 +75,8 @@ pbviewer -c "api records --db local --superuser root --collection posts --page 1
 
 - 기본 포맷은 `table`입니다.
 - `--format csv|markdown`을 사용하면 `--out <path>`가 필수입니다.
+- `api records`는 REPL+TTY 환경에서 기본적으로 풀스크린 TUI(`--view auto`)로 표시됩니다.
+- `--view table`로 텍스트 테이블 출력을 강제할 수 있습니다.
 
 예시:
 

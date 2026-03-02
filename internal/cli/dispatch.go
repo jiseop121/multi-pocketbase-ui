@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"multi-pocketbase-ui/internal/apperr"
 	"multi-pocketbase-ui/internal/pocketbase"
@@ -20,22 +21,66 @@ type DispatcherConfig struct {
 	DataDir string
 }
 
+type commandContext struct {
+	DBAlias        string
+	SuperuserAlias string
+}
+
+type authCacheKey struct {
+	dbAlias string
+	suAlias string
+}
+
+type authCacheEntry struct {
+	token     string
+	expiresAt time.Time
+	hasExpiry bool
+}
+
 type Dispatcher struct {
 	stdout   io.Writer
 	version  string
 	dbStore  *storage.DBStore
 	suStore  *storage.SuperuserStore
+	ctxStore *storage.ContextStore
 	pbClient *pocketbase.Client
+
+	sessionCtx commandContext
+	savedCtx   commandContext
+	hasSaved   bool
+
+	isREPL bool
+	isTTY  bool
+
+	authCache map[authCacheKey]authCacheEntry
+	now       func() time.Time
 }
 
 func NewDispatcher(cfg DispatcherConfig) *Dispatcher {
-	return &Dispatcher{
-		stdout:   cfg.Stdout,
-		version:  cfg.Version,
-		dbStore:  storage.NewDBStore(cfg.DataDir),
-		suStore:  storage.NewSuperuserStore(cfg.DataDir),
-		pbClient: pocketbase.NewClient(),
+	d := &Dispatcher{
+		stdout:    cfg.Stdout,
+		version:   cfg.Version,
+		dbStore:   storage.NewDBStore(cfg.DataDir),
+		suStore:   storage.NewSuperuserStore(cfg.DataDir),
+		ctxStore:  storage.NewContextStore(cfg.DataDir),
+		pbClient:  pocketbase.NewClient(),
+		authCache: map[authCacheKey]authCacheEntry{},
+		now:       time.Now,
 	}
+	if saved, ok, err := d.ctxStore.Load(); err == nil && ok {
+		d.savedCtx = commandContext{DBAlias: saved.DBAlias, SuperuserAlias: saved.SuperuserAlias}
+		d.hasSaved = true
+	}
+	return d
+}
+
+func (d *Dispatcher) SetREPLRuntime(isREPL, isTTY bool) {
+	d.isREPL = isREPL
+	d.isTTY = isTTY
+}
+
+func (d *Dispatcher) IsInteractiveTTY() bool {
+	return d.isREPL && d.isTTY
 }
 
 func (d *Dispatcher) Execute(ctx context.Context, line string) error {
@@ -63,16 +108,25 @@ func (d *Dispatcher) Execute(ctx context.Context, line string) error {
 	case "ui":
 		return apperr.Invalid("UI mode is not available in Track 1.", "")
 	case "db":
-		return d.execDB(tokens[1:])
+		return d.execDB(argsAfterHead(tokens))
 	case "superuser":
-		return d.execSuperuser(tokens[1:])
+		return d.execSuperuser(argsAfterHead(tokens))
+	case "context":
+		return d.execContext(argsAfterHead(tokens))
 	case "api":
-		return d.execAPI(ctx, tokens[1:])
+		return d.execAPI(ctx, argsAfterHead(tokens))
 	case "exit", "quit":
 		return ErrExitRequested
 	default:
 		return apperr.Invalid("Unknown command `"+tokens[0]+"`.", "Run `help` to see available commands.")
 	}
+}
+
+func argsAfterHead(tokens []string) []string {
+	if len(tokens) <= 1 {
+		return []string{}
+	}
+	return tokens[1:]
 }
 
 func (d *Dispatcher) execDB(args []string) error {
@@ -122,6 +176,7 @@ func (d *Dispatcher) execDB(args []string) error {
 		if err := d.dbStore.Remove(*alias); err != nil {
 			return mapStoreError(err)
 		}
+		d.dropContextByDB(*alias)
 		_, _ = fmt.Fprintf(d.stdout, "Removed db alias %q.\n", *alias)
 		return nil
 	default:
@@ -189,10 +244,118 @@ func (d *Dispatcher) execSuperuser(args []string) error {
 		if err := d.suStore.Remove(*dbAlias, *alias); err != nil {
 			return mapStoreError(err)
 		}
+		d.dropContextBySuperuser(*dbAlias, *alias)
 		_, _ = fmt.Fprintf(d.stdout, "Removed superuser alias %q from db %q.\n", *alias, *dbAlias)
 		return nil
 	default:
 		return apperr.Invalid("Unknown superuser subcommand `"+cmd+"`.", "Use: superuser add|list|remove")
+	}
+}
+
+func (d *Dispatcher) execContext(args []string) error {
+	if len(args) == 0 {
+		return apperr.Invalid("Missing context subcommand.", "Use: context show|use|save|clear|unsave")
+	}
+
+	sub := args[0]
+	switch sub {
+	case "show":
+		if len(args) > 1 {
+			return apperr.Invalid("`context show` does not accept extra arguments.", "Use: context show")
+		}
+		rows := []map[string]any{}
+		if strings.TrimSpace(d.sessionCtx.DBAlias) != "" || strings.TrimSpace(d.sessionCtx.SuperuserAlias) != "" {
+			rows = append(rows, map[string]any{
+				"source":          "session",
+				"db_alias":        d.sessionCtx.DBAlias,
+				"superuser_alias": d.sessionCtx.SuperuserAlias,
+			})
+		}
+		if d.hasSaved {
+			rows = append(rows, map[string]any{
+				"source":          "saved",
+				"db_alias":        d.savedCtx.DBAlias,
+				"superuser_alias": d.savedCtx.SuperuserAlias,
+			})
+		}
+		if len(rows) == 0 {
+			_, _ = fmt.Fprintln(d.stdout, "No context configured.")
+			return nil
+		}
+		_, _ = fmt.Fprintln(d.stdout, renderTable([]string{"source", "db_alias", "superuser_alias"}, rows))
+		return nil
+
+	case "use":
+		fs := newFlagSet("context use")
+		dbAlias := fs.String("db", "", "")
+		suAlias := fs.String("superuser", "", "")
+		if err := fs.Parse(args[1:]); err != nil {
+			return invalidFlagError(err)
+		}
+		if strings.TrimSpace(*dbAlias) == "" {
+			return apperr.Invalid("Missing required option `--db`.", "Example: context use --db dev --superuser root")
+		}
+		db, found, err := d.dbStore.Find(*dbAlias)
+		if err != nil {
+			return mapStoreError(err)
+		}
+		if !found {
+			return apperr.Invalid("Could not find a saved db named \""+*dbAlias+"\".", "Run `pbviewer db list` to see available db aliases.")
+		}
+		if strings.TrimSpace(*suAlias) != "" {
+			if _, found, err := d.suStore.Find(db.Alias, *suAlias); err != nil {
+				return mapStoreError(err)
+			} else if !found {
+				return apperr.Invalid("Superuser alias \""+*suAlias+"\" is not configured for db \""+db.Alias+"\".", "Run `pbviewer superuser list --db "+db.Alias+"` to see available aliases.")
+			}
+		}
+		d.sessionCtx = commandContext{DBAlias: db.Alias, SuperuserAlias: strings.TrimSpace(*suAlias)}
+		if d.sessionCtx.SuperuserAlias == "" {
+			_, _ = fmt.Fprintf(d.stdout, "Updated session context: db=%q.\n", d.sessionCtx.DBAlias)
+			return nil
+		}
+		_, _ = fmt.Fprintf(d.stdout, "Updated session context: db=%q superuser=%q.\n", d.sessionCtx.DBAlias, d.sessionCtx.SuperuserAlias)
+		return nil
+
+	case "save":
+		if len(args) > 1 {
+			return apperr.Invalid("`context save` does not accept extra arguments.", "Use: context save")
+		}
+		if strings.TrimSpace(d.sessionCtx.DBAlias) == "" {
+			return apperr.Invalid("No session context to save.", "Run `context use --db <alias> [--superuser <alias>]` first.")
+		}
+		if err := d.persistSavedContext(d.sessionCtx); err != nil {
+			return err
+		}
+		if d.sessionCtx.SuperuserAlias == "" {
+			_, _ = fmt.Fprintf(d.stdout, "Saved default context: db=%q.\n", d.sessionCtx.DBAlias)
+			return nil
+		}
+		_, _ = fmt.Fprintf(d.stdout, "Saved default context: db=%q superuser=%q.\n", d.sessionCtx.DBAlias, d.sessionCtx.SuperuserAlias)
+		return nil
+
+	case "clear":
+		if len(args) > 1 {
+			return apperr.Invalid("`context clear` does not accept extra arguments.", "Use: context clear")
+		}
+		d.sessionCtx = commandContext{}
+		_, _ = fmt.Fprintln(d.stdout, "Cleared session context.")
+		return nil
+
+	case "unsave":
+		if len(args) > 1 {
+			return apperr.Invalid("`context unsave` does not accept extra arguments.", "Use: context unsave")
+		}
+		if err := d.ctxStore.Clear(); err != nil {
+			return mapStoreError(err)
+		}
+		d.savedCtx = commandContext{}
+		d.hasSaved = false
+		_, _ = fmt.Fprintln(d.stdout, "Removed saved default context.")
+		return nil
+
+	default:
+		return apperr.Invalid("Unknown context subcommand `"+sub+"`.", "Use: context show|use|save|clear|unsave")
 	}
 }
 
@@ -219,13 +382,9 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		token, err := d.authenticate(ctx, target)
+		payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildCollectionsEndpoint(), nil)
 		if err != nil {
 			return err
-		}
-		payload, err := d.pbClient.GetJSON(ctx, target.DB.BaseURL, token, pocketbase.BuildCollectionsEndpoint(), nil)
-		if err != nil {
-			return mapPBError(err, target.SU.Alias, target.DB.Alias)
 		}
 		result := pocketbase.ParseItemsResult(payload)
 		return d.writeQueryResult(*format, *out, result)
@@ -250,13 +409,9 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		token, err := d.authenticate(ctx, target)
+		payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildCollectionEndpoint(*name), nil)
 		if err != nil {
 			return err
-		}
-		payload, err := d.pbClient.GetJSON(ctx, target.DB.BaseURL, token, pocketbase.BuildCollectionEndpoint(*name), nil)
-		if err != nil {
-			return mapPBError(err, target.SU.Alias, target.DB.Alias)
 		}
 		result := pocketbase.ParseSingleResult(payload)
 		return d.writeQueryResult(*format, *out, result)
@@ -272,48 +427,72 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		filterExpr := fs.String("filter", "", "")
 		format := fs.String("format", "table", "")
 		out := fs.String("out", "", "")
+		view := fs.String("view", "auto", "")
 		if err := fs.Parse(args[1:]); err != nil {
 			return invalidFlagError(err)
 		}
 		if *collection == "" {
 			return apperr.Invalid("Missing required option `--collection`.", "Example: api records --collection posts")
 		}
-		if _, err := validateOutputOptions(*format, *out); err != nil {
+		normalizedFormat, err := validateOutputOptions(*format, *out)
+		if err != nil {
 			return err
 		}
-		query := map[string]string{}
+		normalizedView, err := normalizeView(*view)
+		if err != nil {
+			return err
+		}
+		if normalizedFormat != "table" && normalizedView == "tui" {
+			return apperr.Invalid("`--view tui` requires `--format table`.", "Use `--format table` or switch view to `table`/`auto`.")
+		}
+		state := RecordsQueryState{
+			Collection: *collection,
+			Sort:       *sortExpr,
+			Filter:     *filterExpr,
+		}
 		if *page != "" {
-			if _, err := positiveInt(*page); err != nil {
+			v, err := positiveInt(*page)
+			if err != nil {
 				return apperr.Invalid("Invalid `--page` value.", "`--page` must be a positive integer.")
 			}
-			query["page"] = *page
+			state.Page = v
 		}
 		if *perPage != "" {
-			if _, err := positiveInt(*perPage); err != nil {
+			v, err := positiveInt(*perPage)
+			if err != nil {
 				return apperr.Invalid("Invalid `--per-page` value.", "`--per-page` must be a positive integer.")
 			}
-			query["perPage"] = *perPage
-		}
-		if *sortExpr != "" {
-			query["sort"] = *sortExpr
-		}
-		if *filterExpr != "" {
-			query["filter"] = *filterExpr
+			state.PerPage = v
 		}
 		target, err := d.resolveTarget(*dbAlias, *suAlias)
 		if err != nil {
 			return err
 		}
-		token, err := d.authenticate(ctx, target)
+
+		shouldTUI := false
+		switch normalizedView {
+		case "tui":
+			if normalizedFormat != "table" {
+				return apperr.Invalid("`--view tui` requires `--format table`.", "Use `--format table`.")
+			}
+			if !d.IsInteractiveTTY() {
+				return apperr.Invalid("`--view tui` requires interactive REPL TTY mode.", "Run `pbviewer` in a terminal and execute this command there.")
+			}
+			shouldTUI = true
+		case "auto":
+			shouldTUI = normalizedFormat == "table" && d.IsInteractiveTTY()
+		case "table":
+			shouldTUI = false
+		}
+
+		if shouldTUI {
+			return d.runRecordsTUI(ctx, target, state)
+		}
+		result, err := d.fetchRecords(ctx, target, state)
 		if err != nil {
 			return err
 		}
-		payload, err := d.pbClient.GetJSON(ctx, target.DB.BaseURL, token, pocketbase.BuildRecordsEndpoint(*collection), query)
-		if err != nil {
-			return mapPBError(err, target.SU.Alias, target.DB.Alias)
-		}
-		result := pocketbase.ParseItemsResult(payload)
-		return d.writeQueryResult(*format, *out, result)
+		return d.writeQueryResult(normalizedFormat, *out, result)
 
 	case "record":
 		fs := newFlagSet("api record")
@@ -329,25 +508,35 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if *collection == "" || *recordID == "" {
 			return apperr.Invalid("Missing required options `--collection` and `--id`.", "Example: api record --collection posts --id rec123")
 		}
-		if _, err := validateOutputOptions(*format, *out); err != nil {
+		normalizedFormat, err := validateOutputOptions(*format, *out)
+		if err != nil {
 			return err
 		}
 		target, err := d.resolveTarget(*dbAlias, *suAlias)
 		if err != nil {
 			return err
 		}
-		token, err := d.authenticate(ctx, target)
+		payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildRecordEndpoint(*collection, *recordID), nil)
 		if err != nil {
 			return err
 		}
-		payload, err := d.pbClient.GetJSON(ctx, target.DB.BaseURL, token, pocketbase.BuildRecordEndpoint(*collection, *recordID), nil)
-		if err != nil {
-			return mapPBError(err, target.SU.Alias, target.DB.Alias)
-		}
 		result := pocketbase.ParseSingleResult(payload)
-		return d.writeQueryResult(*format, *out, result)
+		return d.writeQueryResult(normalizedFormat, *out, result)
 	default:
 		return apperr.Invalid("This CLI is read-only for PocketBase API operations.", "Only GET requests are supported.")
+	}
+}
+
+func normalizeView(view string) (string, error) {
+	v := strings.ToLower(strings.TrimSpace(view))
+	if v == "" {
+		return "auto", nil
+	}
+	switch v {
+	case "auto", "tui", "table":
+		return v, nil
+	default:
+		return "", apperr.Invalid("Unsupported view mode.", "Use one of: auto, tui, table.")
 	}
 }
 
@@ -357,32 +546,141 @@ type pbTarget struct {
 }
 
 func (d *Dispatcher) resolveTarget(dbAlias, suAlias string) (pbTarget, error) {
-	if strings.TrimSpace(dbAlias) == "" || strings.TrimSpace(suAlias) == "" {
-		return pbTarget{}, apperr.Invalid("Missing required options `--db` and `--superuser`.", "Example: --db dev --superuser root")
+	resolvedDB, resolvedSU, err := d.resolveAliases(dbAlias, suAlias)
+	if err != nil {
+		return pbTarget{}, err
 	}
-	db, found, err := d.dbStore.Find(dbAlias)
+
+	db, found, err := d.dbStore.Find(resolvedDB)
 	if err != nil {
 		return pbTarget{}, mapStoreError(err)
 	}
 	if !found {
-		return pbTarget{}, apperr.Invalid("Could not find a saved db named \""+dbAlias+"\".", "Run `pbviewer db list` to see available db aliases.")
+		return pbTarget{}, apperr.Invalid("Could not find a saved db named \""+resolvedDB+"\".", "Run `pbviewer db list` to see available db aliases.")
 	}
-	su, found, err := d.suStore.Find(dbAlias, suAlias)
+	su, found, err := d.suStore.Find(db.Alias, resolvedSU)
 	if err != nil {
 		return pbTarget{}, mapStoreError(err)
 	}
 	if !found {
-		return pbTarget{}, apperr.Invalid("Superuser alias \""+suAlias+"\" is not configured for db \""+dbAlias+"\".", "Run `pbviewer superuser list --db "+dbAlias+"` to see available aliases.")
+		return pbTarget{}, apperr.Invalid("Superuser alias \""+resolvedSU+"\" is not configured for db \""+db.Alias+"\".", "Run `pbviewer superuser list --db "+db.Alias+"` to see available aliases.")
 	}
 	return pbTarget{DB: db, SU: su}, nil
 }
 
-func (d *Dispatcher) authenticate(ctx context.Context, target pbTarget) (string, error) {
+func (d *Dispatcher) resolveAliases(dbAlias, suAlias string) (string, string, error) {
+	explicit := commandContext{DBAlias: strings.TrimSpace(dbAlias), SuperuserAlias: strings.TrimSpace(suAlias)}
+
+	resolvedDB := explicit.DBAlias
+	if resolvedDB == "" {
+		if strings.TrimSpace(d.sessionCtx.DBAlias) != "" {
+			resolvedDB = d.sessionCtx.DBAlias
+		} else if d.hasSaved {
+			resolvedDB = d.savedCtx.DBAlias
+		}
+	}
+
+	resolvedSU := explicit.SuperuserAlias
+	if resolvedSU == "" {
+		if strings.TrimSpace(d.sessionCtx.SuperuserAlias) != "" && contextMatchesDB(d.sessionCtx, resolvedDB) {
+			resolvedSU = d.sessionCtx.SuperuserAlias
+		} else if d.hasSaved && strings.TrimSpace(d.savedCtx.SuperuserAlias) != "" && contextMatchesDB(d.savedCtx, resolvedDB) {
+			resolvedSU = d.savedCtx.SuperuserAlias
+		}
+	}
+
+	if strings.TrimSpace(resolvedDB) == "" || strings.TrimSpace(resolvedSU) == "" {
+		return "", "", apperr.Invalid("Missing required options `--db` and `--superuser`.", "Set context with `context use --db <alias> --superuser <alias>` or provide flags explicitly.")
+	}
+	return resolvedDB, resolvedSU, nil
+}
+
+func contextMatchesDB(ctx commandContext, resolvedDB string) bool {
+	if strings.TrimSpace(ctx.DBAlias) == "" {
+		return true
+	}
+	if strings.TrimSpace(resolvedDB) == "" {
+		return false
+	}
+	return strings.EqualFold(ctx.DBAlias, resolvedDB)
+}
+
+func (d *Dispatcher) fetchRecords(ctx context.Context, target pbTarget, state RecordsQueryState) (pocketbase.QueryResult, error) {
+	payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildRecordsEndpoint(state.Collection), state.QueryParams())
+	if err != nil {
+		return pocketbase.QueryResult{}, err
+	}
+	return pocketbase.ParseItemsResult(payload), nil
+}
+
+func (d *Dispatcher) getJSONWithAuth(ctx context.Context, target pbTarget, endpoint string, query map[string]string) (map[string]any, error) {
+	token, err := d.authenticate(ctx, target, false)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := d.pbClient.GetJSON(ctx, target.DB.BaseURL, token, endpoint, query)
+	if err == nil {
+		return payload, nil
+	}
+	var authErr *pocketbase.AuthError
+	if !errors.As(err, &authErr) {
+		return nil, mapPBError(err, target.SU.Alias, target.DB.Alias)
+	}
+
+	d.clearAuthCache(target)
+	token, err = d.authenticate(ctx, target, true)
+	if err != nil {
+		return nil, err
+	}
+	payload, err = d.pbClient.GetJSON(ctx, target.DB.BaseURL, token, endpoint, query)
+	if err != nil {
+		return nil, mapPBError(err, target.SU.Alias, target.DB.Alias)
+	}
+	return payload, nil
+}
+
+func (d *Dispatcher) authenticate(ctx context.Context, target pbTarget, force bool) (string, error) {
+	if !force {
+		if token, ok := d.getCachedToken(target); ok {
+			return token, nil
+		}
+	}
 	token, err := d.pbClient.Authenticate(ctx, target.DB.BaseURL, target.SU.Email, target.SU.Password)
 	if err != nil {
 		return "", mapPBError(err, target.SU.Alias, target.DB.Alias)
 	}
+	d.storeCachedToken(target, token)
 	return token, nil
+}
+
+func (d *Dispatcher) getCachedToken(target pbTarget) (string, bool) {
+	entry, ok := d.authCache[authCacheKey{dbAlias: strings.ToLower(target.DB.Alias), suAlias: strings.ToLower(target.SU.Alias)}]
+	if !ok {
+		return "", false
+	}
+	if entry.hasExpiry {
+		now := d.now().UTC()
+		if !entry.expiresAt.After(now.Add(30 * time.Second)) {
+			d.clearAuthCache(target)
+			return "", false
+		}
+	}
+	return entry.token, true
+}
+
+func (d *Dispatcher) storeCachedToken(target pbTarget, token string) {
+	entry := authCacheEntry{token: token}
+	if expiresAt, ok := parseTokenExpiry(token); ok {
+		entry.expiresAt = expiresAt
+		entry.hasExpiry = true
+	}
+	key := authCacheKey{dbAlias: strings.ToLower(target.DB.Alias), suAlias: strings.ToLower(target.SU.Alias)}
+	d.authCache[key] = entry
+}
+
+func (d *Dispatcher) clearAuthCache(target pbTarget) {
+	delete(d.authCache, authCacheKey{dbAlias: strings.ToLower(target.DB.Alias), suAlias: strings.ToLower(target.SU.Alias)})
 }
 
 func (d *Dispatcher) writeQueryResult(format, out string, result pocketbase.QueryResult) error {
@@ -392,6 +690,37 @@ func (d *Dispatcher) writeQueryResult(format, out string, result pocketbase.Quer
 	}
 	_, _ = fmt.Fprintln(d.stdout, text)
 	return nil
+}
+
+func (d *Dispatcher) persistSavedContext(ctx commandContext) error {
+	err := d.ctxStore.Save(storage.Context{DBAlias: ctx.DBAlias, SuperuserAlias: ctx.SuperuserAlias})
+	if err != nil {
+		return mapStoreError(err)
+	}
+	d.savedCtx = ctx
+	d.hasSaved = true
+	return nil
+}
+
+func (d *Dispatcher) dropContextByDB(dbAlias string) {
+	if strings.EqualFold(d.sessionCtx.DBAlias, dbAlias) {
+		d.sessionCtx = commandContext{}
+	}
+	if d.hasSaved && strings.EqualFold(d.savedCtx.DBAlias, dbAlias) {
+		_ = d.ctxStore.Clear()
+		d.savedCtx = commandContext{}
+		d.hasSaved = false
+	}
+}
+
+func (d *Dispatcher) dropContextBySuperuser(dbAlias, suAlias string) {
+	if strings.EqualFold(d.sessionCtx.DBAlias, dbAlias) && strings.EqualFold(d.sessionCtx.SuperuserAlias, suAlias) {
+		d.sessionCtx.SuperuserAlias = ""
+	}
+	if d.hasSaved && strings.EqualFold(d.savedCtx.DBAlias, dbAlias) && strings.EqualFold(d.savedCtx.SuperuserAlias, suAlias) {
+		d.savedCtx.SuperuserAlias = ""
+		_ = d.persistSavedContext(d.savedCtx)
+	}
 }
 
 func newFlagSet(name string) *flag.FlagSet {
@@ -472,18 +801,27 @@ Superuser commands:
   superuser remove --db <dbAlias> --alias <superuserAlias>
                                   Remove a saved superuser alias.
 
+Context commands:
+  context show                    Show current session/saved target context.
+  context use --db <dbAlias> [--superuser <superuserAlias>]
+                                  Set active session target context.
+  context save                    Save current session context as default.
+  context clear                   Clear current session context.
+  context unsave                  Remove saved default context.
+
 API commands (read-only GET):
   api collections --db <dbAlias> --superuser <superuserAlias> [--format table|csv|markdown] [--out <path>]
                                   List collections from PocketBase.
   api collection --db <dbAlias> --superuser <superuserAlias> --name <collectionName> [--format table|csv|markdown] [--out <path>]
                                   Get one collection by name.
-  api records --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> [--page <n>] [--per-page <n>] [--sort <expr>] [--filter <expr>] [--format table|csv|markdown] [--out <path>]
+  api records --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> [--page <n>] [--per-page <n>] [--sort <expr>] [--filter <expr>] [--view auto|tui|table] [--format table|csv|markdown] [--out <path>]
                                   List records with paging, sort, and filter options.
   api record --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> --id <recordId> [--format table|csv|markdown] [--out <path>]
                                   Get one record by id.
 
 Output:
   Default format is table.
-  csv/markdown requires --out <path>.`)
+  csv/markdown requires --out <path>.
+  TUI view is available in interactive REPL TTY mode.`)
 	_, _ = fmt.Fprintln(d.stdout, help)
 }

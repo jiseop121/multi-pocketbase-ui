@@ -25,10 +25,11 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return MapErrorToExitCode(err)
 	}
 
+	dataDir := defaultDataDir()
 	dispatcher := cli.NewDispatcher(cli.DispatcherConfig{
 		Stdout:  cfg.Stdout,
 		Version: Version,
-		DataDir: defaultDataDir(),
+		DataDir: dataDir,
 	})
 
 	result := modeResult{}
@@ -41,7 +42,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	case ModeScript:
 		result = runScript(ctx, cfg.ScriptPath, cfg.Stderr, dispatcher)
 	case ModeREPL:
-		result = runREPL(ctx, cfg.Stdin, cfg.Stdout, cfg.Stderr, dispatcher)
+		result = runREPL(ctx, cfg.Stdin, cfg.Stdout, cfg.Stderr, dataDir, dispatcher)
 	default:
 		result.err = NewRuntimeError("Could not resolve execution mode.", "", nil)
 	}
@@ -88,20 +89,28 @@ func runScript(ctx context.Context, path string, stderr io.Writer, dispatcher *c
 	return modeResult{err: lastErr, alreadyReported: true}
 }
 
-func runREPL(ctx context.Context, stdin io.Reader, stdout io.Writer, stderr io.Writer, dispatcher *cli.Dispatcher) modeResult {
+func runREPL(ctx context.Context, stdin io.Reader, stdout io.Writer, stderr io.Writer, dataDir string, dispatcher *cli.Dispatcher) modeResult {
 	var lastErr error
 
-	err := cli.RunREPL(ctx, stdin, stdout, func(line string) error {
-		execErr := dispatcher.Execute(ctx, line)
-		if execErr == nil {
+	isTTY := cli.IsTTY(stdin, stdout)
+	dispatcher.SetREPLRuntime(true, isTTY)
+	err := cli.RunREPLWithConfig(ctx, cli.REPLConfig{
+		Stdin:       stdin,
+		Stdout:      stdout,
+		HistoryFile: filepath.Join(dataDir, "history"),
+		Complete:    dispatcher.Complete,
+		Execute: func(line string) error {
+			execErr := dispatcher.Execute(ctx, line)
+			if execErr == nil {
+				return nil
+			}
+			if errors.Is(execErr, cli.ErrExitRequested) {
+				return execErr
+			}
+			writeError(stderr, execErr)
+			lastErr = execErr
 			return nil
-		}
-		if errors.Is(execErr, cli.ErrExitRequested) {
-			return execErr
-		}
-		writeError(stderr, execErr)
-		lastErr = execErr
-		return nil
+		},
 	})
 
 	if err != nil {
