@@ -46,7 +46,7 @@ func (d *Dispatcher) Execute(ctx context.Context, line string) error {
 	if len(tokens) == 0 {
 		return nil
 	}
-	if tokens[0] == "pbmulti" {
+	if tokens[0] == "pbviewer" {
 		tokens = tokens[1:]
 		if len(tokens) == 0 {
 			return nil
@@ -150,7 +150,7 @@ func (d *Dispatcher) execSuperuser(args []string) error {
 		if _, found, err := d.dbStore.Find(*dbAlias); err != nil {
 			return mapStoreError(err)
 		} else if !found {
-			return apperr.Invalid("Could not find a saved db named \""+*dbAlias+"\".", "Run `pbmulti db list` to see available db aliases.")
+			return apperr.Invalid("Could not find a saved db named \""+*dbAlias+"\".", "Run `pbviewer db list` to see available db aliases.")
 		}
 		if err := d.suStore.Add(*dbAlias, *alias, *email, *password); err != nil {
 			return mapStoreError(err)
@@ -365,14 +365,14 @@ func (d *Dispatcher) resolveTarget(dbAlias, suAlias string) (pbTarget, error) {
 		return pbTarget{}, mapStoreError(err)
 	}
 	if !found {
-		return pbTarget{}, apperr.Invalid("Could not find a saved db named \""+dbAlias+"\".", "Run `pbmulti db list` to see available db aliases.")
+		return pbTarget{}, apperr.Invalid("Could not find a saved db named \""+dbAlias+"\".", "Run `pbviewer db list` to see available db aliases.")
 	}
 	su, found, err := d.suStore.Find(dbAlias, suAlias)
 	if err != nil {
 		return pbTarget{}, mapStoreError(err)
 	}
 	if !found {
-		return pbTarget{}, apperr.Invalid("Superuser alias \""+suAlias+"\" is not configured for db \""+dbAlias+"\".", "Run `pbmulti superuser list --db "+dbAlias+"` to see available aliases.")
+		return pbTarget{}, apperr.Invalid("Superuser alias \""+suAlias+"\" is not configured for db \""+dbAlias+"\".", "Run `pbviewer superuser list --db "+dbAlias+"` to see available aliases.")
 	}
 	return pbTarget{DB: db, SU: su}, nil
 }
@@ -448,12 +448,12 @@ func positiveInt(s string) (int, error) {
 }
 
 func (d *Dispatcher) printHelp() {
-	help := strings.TrimSpace(`pbmulti command reference
+	help := strings.TrimSpace(`pbviewer command reference
 
 Run modes:
-  pbmulti                         Start REPL mode.
-  pbmulti -c "<command>"          Run one command and exit.
-  pbmulti <script-file>           Execute commands from a script file.
+  pbviewer                         Start REPL mode.
+  pbviewer -c "<command>"          Run one command and exit.
+  pbviewer <script-file>           Execute commands from a script file.
 
 Core commands:
   version                         Print CLI version.

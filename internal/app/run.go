@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,7 +11,12 @@ import (
 	"multi-pocketbase-ui/internal/cli"
 )
 
-const Version = "0.2.1"
+const Version = "0.2.2"
+
+type modeResult struct {
+	err             error
+	alreadyReported bool
+}
 
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	cfg, err := ParseRunConfig(args, stdin, stdout, stderr)
@@ -25,44 +31,89 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		DataDir: defaultDataDir(),
 	})
 
+	result := modeResult{}
 	mode := ResolveMode(cfg)
 	switch mode {
 	case ModeUIReserved:
-		err = NewInvalidArgsError("UI mode is not available in Track 1.", "")
+		result.err = NewInvalidArgsError("UI mode is not available in Track 1.", "")
 	case ModeOneShot:
-		err = runOneShot(ctx, cfg.CommandText, dispatcher)
+		result.err = runOneShot(ctx, cfg.CommandText, dispatcher)
 	case ModeScript:
-		err = runScript(ctx, cfg.ScriptPath, dispatcher)
+		result = runScript(ctx, cfg.ScriptPath, cfg.Stderr, dispatcher)
 	case ModeREPL:
-		err = runREPL(ctx, cfg.Stdin, cfg.Stdout, dispatcher)
+		result = runREPL(ctx, cfg.Stdin, cfg.Stdout, cfg.Stderr, dispatcher)
 	default:
-		err = NewRuntimeError("Could not resolve execution mode.", "", nil)
+		result.err = NewRuntimeError("Could not resolve execution mode.", "", nil)
 	}
 
-	if err != nil {
-		writeError(cfg.Stderr, err)
+	if result.err != nil && !result.alreadyReported {
+		writeError(cfg.Stderr, result.err)
 	}
-	return MapErrorToExitCode(err)
+	return MapErrorToExitCode(result.err)
 }
 
 func runOneShot(ctx context.Context, commandText string, dispatcher *cli.Dispatcher) error {
 	return dispatcher.Execute(ctx, commandText)
 }
 
-func runScript(ctx context.Context, path string, dispatcher *cli.Dispatcher) error {
-	return cli.RunScript(ctx, path, func(lineNo int, line string) error {
-		err := dispatcher.Execute(ctx, line)
-		if err != nil {
-			return WrapScriptLineError(lineNo, err)
+func runScript(ctx context.Context, path string, stderr io.Writer, dispatcher *cli.Dispatcher) modeResult {
+	var lastErr error
+
+	err := cli.RunScript(ctx, path, func(lineNo int, line string) error {
+		execErr := dispatcher.Execute(ctx, line)
+		if execErr == nil {
+			return nil
 		}
+		if errors.Is(execErr, cli.ErrExitRequested) {
+			return cli.ErrExitRequested
+		}
+		wrapped := WrapScriptLineError(lineNo, execErr)
+		writeError(stderr, wrapped)
+		lastErr = execErr
 		return nil
 	})
+
+	if err != nil {
+		if errors.Is(err, cli.ErrExitRequested) {
+			if lastErr == nil {
+				return modeResult{}
+			}
+			return modeResult{err: lastErr, alreadyReported: true}
+		}
+		return modeResult{err: err}
+	}
+	if lastErr == nil {
+		return modeResult{}
+	}
+	return modeResult{err: lastErr, alreadyReported: true}
 }
 
-func runREPL(ctx context.Context, stdin io.Reader, stdout io.Writer, dispatcher *cli.Dispatcher) error {
-	return cli.RunREPL(ctx, stdin, stdout, func(line string) error {
-		return dispatcher.Execute(ctx, line)
+func runREPL(ctx context.Context, stdin io.Reader, stdout io.Writer, stderr io.Writer, dispatcher *cli.Dispatcher) modeResult {
+	var lastErr error
+
+	err := cli.RunREPL(ctx, stdin, stdout, func(line string) error {
+		execErr := dispatcher.Execute(ctx, line)
+		if execErr == nil {
+			return nil
+		}
+		if errors.Is(execErr, cli.ErrExitRequested) {
+			return execErr
+		}
+		writeError(stderr, execErr)
+		lastErr = execErr
+		return nil
 	})
+
+	if err != nil {
+		if errors.Is(err, cli.ErrExitRequested) {
+			return modeResult{}
+		}
+		return modeResult{err: err}
+	}
+	if lastErr == nil {
+		return modeResult{}
+	}
+	return modeResult{err: lastErr, alreadyReported: true}
 }
 
 func writeError(stderr io.Writer, err error) {
@@ -73,12 +124,12 @@ func writeError(stderr io.Writer, err error) {
 }
 
 func defaultDataDir() string {
-	if custom := os.Getenv("PBMULTI_HOME"); custom != "" {
+	if custom := os.Getenv("PBVIEWER_HOME"); custom != "" {
 		return custom
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ".pbmulti"
+		return ".pbviewer"
 	}
-	return filepath.Join(home, ".pbmulti")
+	return filepath.Join(home, ".pbviewer")
 }
