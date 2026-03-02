@@ -176,7 +176,9 @@ func (d *Dispatcher) execDB(args []string) error {
 		if err := d.dbStore.Remove(*alias); err != nil {
 			return mapStoreError(err)
 		}
-		d.dropContextByDB(*alias)
+		if err := d.dropContextByDB(*alias); err != nil {
+			return err
+		}
 		_, _ = fmt.Fprintf(d.stdout, "Removed db alias %q.\n", *alias)
 		return nil
 	default:
@@ -244,7 +246,9 @@ func (d *Dispatcher) execSuperuser(args []string) error {
 		if err := d.suStore.Remove(*dbAlias, *alias); err != nil {
 			return mapStoreError(err)
 		}
-		d.dropContextBySuperuser(*dbAlias, *alias)
+		if err := d.dropContextBySuperuser(*dbAlias, *alias); err != nil {
+			return err
+		}
 		_, _ = fmt.Fprintf(d.stdout, "Removed superuser alias %q from db %q.\n", *alias, *dbAlias)
 		return nil
 	default:
@@ -702,25 +706,31 @@ func (d *Dispatcher) persistSavedContext(ctx commandContext) error {
 	return nil
 }
 
-func (d *Dispatcher) dropContextByDB(dbAlias string) {
+func (d *Dispatcher) dropContextByDB(dbAlias string) error {
 	if strings.EqualFold(d.sessionCtx.DBAlias, dbAlias) {
 		d.sessionCtx = commandContext{}
 	}
 	if d.hasSaved && strings.EqualFold(d.savedCtx.DBAlias, dbAlias) {
-		_ = d.ctxStore.Clear()
+		if err := d.ctxStore.Clear(); err != nil {
+			return mapStoreError(err)
+		}
 		d.savedCtx = commandContext{}
 		d.hasSaved = false
 	}
+	return nil
 }
 
-func (d *Dispatcher) dropContextBySuperuser(dbAlias, suAlias string) {
+func (d *Dispatcher) dropContextBySuperuser(dbAlias, suAlias string) error {
 	if strings.EqualFold(d.sessionCtx.DBAlias, dbAlias) && strings.EqualFold(d.sessionCtx.SuperuserAlias, suAlias) {
 		d.sessionCtx.SuperuserAlias = ""
 	}
 	if d.hasSaved && strings.EqualFold(d.savedCtx.DBAlias, dbAlias) && strings.EqualFold(d.savedCtx.SuperuserAlias, suAlias) {
 		d.savedCtx.SuperuserAlias = ""
-		_ = d.persistSavedContext(d.savedCtx)
+		if err := d.persistSavedContext(d.savedCtx); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func newFlagSet(name string) *flag.FlagSet {
