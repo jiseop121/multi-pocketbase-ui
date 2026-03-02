@@ -27,7 +27,6 @@ type APIError struct {
 	Status  int
 	Code    string
 	Message string
-	Body    string
 	Cause   error
 }
 
