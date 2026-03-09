@@ -10,8 +10,8 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"multi-pocketbase-ui/internal/apperr"
-	"multi-pocketbase-ui/internal/pocketbase"
+	"github.com/jiseop121/pbdash/internal/apperr"
+	"github.com/jiseop121/pbdash/internal/pocketbase"
 )
 
 const visibleColumnWindow = 8

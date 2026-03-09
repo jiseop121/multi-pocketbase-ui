@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"multi-pocketbase-ui/internal/app"
+	"github.com/jiseop121/pbdash/internal/app"
 )
 
 func main() {

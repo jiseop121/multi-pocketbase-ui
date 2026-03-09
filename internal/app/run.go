@@ -8,10 +8,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"multi-pocketbase-ui/internal/cli"
+	"github.com/jiseop121/pbdash/internal/cli"
 )
 
-const Version = "0.3.1"
+const Version = "1.0.0"
 
 type modeResult struct {
 	err             error
@@ -136,12 +136,12 @@ func writeError(stderr io.Writer, err error) {
 }
 
 func defaultDataDir() string {
-	if custom := os.Getenv("PBVIEWER_HOME"); custom != "" {
+	if custom := os.Getenv("PBDASH_HOME"); custom != "" {
 		return custom
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ".pbviewer"
+		return ".pbdash"
 	}
-	return filepath.Join(home, ".pbviewer")
+	return filepath.Join(home, ".pbdash")
 }

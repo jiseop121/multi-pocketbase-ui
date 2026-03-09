@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-03-09
+
+### Changed
+- Rebranded project name to `PocketBase Dash` and renamed CLI binary/command to `pbdash`.
+- Renamed Homebrew formula to `pbdash` and updated release artifacts/repo paths to `jiseop121/pbdash`.
+- Updated help text, prompts, build/install commands, and docs to use `pbdash`.
+
+### Breaking
+- Removed `pbviewer` command compatibility. Use `pbdash`.
+- Replaced `PBVIEWER_HOME` with `PBDASH_HOME`.
+- Replaced `PBVIEWER_SUPERUSER_KEY_B64` with `PBDASH_SUPERUSER_KEY_B64`.
+- Changed default data directory from `~/.pbviewer` to `~/.pbdash`.
+
 ## [0.3.0] - 2026-03-02
 
 ### Added

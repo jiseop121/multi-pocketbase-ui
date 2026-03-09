@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"multi-pocketbase-ui/internal/apperr"
-	"multi-pocketbase-ui/internal/pocketbase"
+	"github.com/jiseop121/pbdash/internal/apperr"
+	"github.com/jiseop121/pbdash/internal/pocketbase"
 )
 
 func TestRenderQueryResultTableIncludesRows(t *testing.T) {

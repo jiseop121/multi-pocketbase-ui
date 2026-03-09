@@ -14,7 +14,7 @@ func TestVersionMatchesFormulaVersion(t *testing.T) {
 		t.Fatalf("failed to resolve caller")
 	}
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", ".."))
-	formulaPath := filepath.Join(repoRoot, "Formula", "pocketbase-multiview.rb")
+	formulaPath := filepath.Join(repoRoot, "Formula", "pbdash.rb")
 
 	data, err := os.ReadFile(formulaPath)
 	if err != nil {

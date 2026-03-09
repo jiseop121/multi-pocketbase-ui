@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"multi-pocketbase-ui/internal/apperr"
-	"multi-pocketbase-ui/internal/pocketbase"
-	"multi-pocketbase-ui/internal/storage"
+	"github.com/jiseop121/pbdash/internal/apperr"
+	"github.com/jiseop121/pbdash/internal/pocketbase"
+	"github.com/jiseop121/pbdash/internal/storage"
 )
 
 func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
@@ -188,7 +188,7 @@ func shouldUseRecordsTUI(view, format string, interactiveTTY bool) (bool, error)
 	switch view {
 	case "tui":
 		if !interactiveTTY {
-			return false, apperr.Invalid("`--view tui` requires interactive REPL TTY mode.", "Run `pbviewer` in a terminal and execute this command there.")
+			return false, apperr.Invalid("`--view tui` requires interactive REPL TTY mode.", "Run `pbdash` in a terminal and execute this command there.")
 		}
 		return true, nil
 	case "auto":
@@ -216,14 +216,14 @@ func (d *Dispatcher) resolveTarget(dbAlias, suAlias string) (pbTarget, error) {
 		return pbTarget{}, mapStoreError(err)
 	}
 	if !found {
-		return pbTarget{}, apperr.Invalid("Could not find a saved db named \""+resolvedDB+"\".", "Run `pbviewer db list` to see available db aliases.")
+		return pbTarget{}, apperr.Invalid("Could not find a saved db named \""+resolvedDB+"\".", "Run `pbdash db list` to see available db aliases.")
 	}
 	su, found, err := d.suStore.Find(db.Alias, resolvedSU)
 	if err != nil {
 		return pbTarget{}, mapStoreError(err)
 	}
 	if !found {
-		return pbTarget{}, apperr.Invalid("Superuser alias \""+resolvedSU+"\" is not configured for db \""+db.Alias+"\".", "Run `pbviewer superuser list --db "+db.Alias+"` to see available aliases.")
+		return pbTarget{}, apperr.Invalid("Superuser alias \""+resolvedSU+"\" is not configured for db \""+db.Alias+"\".", "Run `pbdash superuser list --db "+db.Alias+"` to see available aliases.")
 	}
 	return pbTarget{DB: db, SU: su}, nil
 }

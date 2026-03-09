@@ -79,7 +79,7 @@ func TestSuperuserStoreMigratesLegacyPlaintextOnWrite(t *testing.T) {
 func TestSuperuserStoreUsesEnvKeyWithoutPersistingKeyFile(t *testing.T) {
 	key := strings.Repeat("k", 32)
 	encoded := base64.StdEncoding.EncodeToString([]byte(key))
-	t.Setenv("PBVIEWER_SUPERUSER_KEY_B64", encoded)
+	t.Setenv("PBDASH_SUPERUSER_KEY_B64", encoded)
 
 	dir := t.TempDir()
 	store := NewSuperuserStore(dir)
@@ -104,13 +104,13 @@ func TestSuperuserStoreUsesEnvKeyWithoutPersistingKeyFile(t *testing.T) {
 }
 
 func TestSuperuserStoreRejectsInvalidEnvKey(t *testing.T) {
-	t.Setenv("PBVIEWER_SUPERUSER_KEY_B64", "invalid")
+	t.Setenv("PBDASH_SUPERUSER_KEY_B64", "invalid")
 	store := NewSuperuserStore(t.TempDir())
 	err := store.Add("dev", "root", "root@example.com", "pw123456")
 	if err == nil {
 		t.Fatalf("expected error for invalid env key")
 	}
-	if !strings.Contains(err.Error(), "PBVIEWER_SUPERUSER_KEY_B64") {
+	if !strings.Contains(err.Error(), "PBDASH_SUPERUSER_KEY_B64") {
 		t.Fatalf("missing env key context: %v", err)
 	}
 }

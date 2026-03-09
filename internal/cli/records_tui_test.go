@@ -7,7 +7,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"multi-pocketbase-ui/internal/pocketbase"
+	"github.com/jiseop121/pbdash/internal/pocketbase"
 )
 
 func TestRecordsTUIHandleKeySupportsArrowHorizontalNavigation(t *testing.T) {

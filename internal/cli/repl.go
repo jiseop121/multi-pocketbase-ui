@@ -62,7 +62,7 @@ func runScannerREPL(ctx context.Context, cfg REPLConfig) error {
 		default:
 		}
 
-		if _, err := fmt.Fprint(cfg.Stdout, "pbviewer> "); err != nil {
+		if _, err := fmt.Fprint(cfg.Stdout, "pbdash> "); err != nil {
 			return err
 		}
 		if !scanner.Scan() {
@@ -100,7 +100,7 @@ func runReadlineREPL(ctx context.Context, cfg REPLConfig) error {
 	}
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:          "pbviewer> ",
+		Prompt:          "pbdash> ",
 		Stdin:           inFile,
 		Stdout:          outFile,
 		Stderr:          outFile,

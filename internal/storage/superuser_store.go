@@ -27,7 +27,7 @@ type SuperuserStore struct {
 	keyPath string
 }
 
-const superuserKeyEnv = "PBVIEWER_SUPERUSER_KEY_B64"
+const superuserKeyEnv = "PBDASH_SUPERUSER_KEY_B64"
 
 func NewSuperuserStore(dataDir string) *SuperuserStore {
 	return &SuperuserStore{

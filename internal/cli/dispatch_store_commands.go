@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"multi-pocketbase-ui/internal/apperr"
-	"multi-pocketbase-ui/internal/storage"
+	"github.com/jiseop121/pbdash/internal/apperr"
+	"github.com/jiseop121/pbdash/internal/storage"
 )
 
 func (d *Dispatcher) execDB(args []string) error {
@@ -86,7 +86,7 @@ func (d *Dispatcher) execSuperuser(args []string) error {
 		if _, found, err := d.dbStore.Find(*dbAlias); err != nil {
 			return mapStoreError(err)
 		} else if !found {
-			return apperr.Invalid("Could not find a saved db named \""+*dbAlias+"\".", "Run `pbviewer db list` to see available db aliases.")
+			return apperr.Invalid("Could not find a saved db named \""+*dbAlias+"\".", "Run `pbdash db list` to see available db aliases.")
 		}
 		if err := d.suStore.Add(*dbAlias, *alias, *email, *password); err != nil {
 			return mapStoreError(err)
@@ -183,13 +183,13 @@ func (d *Dispatcher) execContext(args []string) error {
 			return mapStoreError(err)
 		}
 		if !found {
-			return apperr.Invalid("Could not find a saved db named \""+*dbAlias+"\".", "Run `pbviewer db list` to see available db aliases.")
+			return apperr.Invalid("Could not find a saved db named \""+*dbAlias+"\".", "Run `pbdash db list` to see available db aliases.")
 		}
 		if strings.TrimSpace(*suAlias) != "" {
 			if _, found, err := d.suStore.Find(db.Alias, *suAlias); err != nil {
 				return mapStoreError(err)
 			} else if !found {
-				return apperr.Invalid("Superuser alias \""+*suAlias+"\" is not configured for db \""+db.Alias+"\".", "Run `pbviewer superuser list --db "+db.Alias+"` to see available aliases.")
+				return apperr.Invalid("Superuser alias \""+*suAlias+"\" is not configured for db \""+db.Alias+"\".", "Run `pbdash superuser list --db "+db.Alias+"` to see available aliases.")
 			}
 		}
 		d.sessionCtx = commandContext{DBAlias: db.Alias, SuperuserAlias: strings.TrimSpace(*suAlias)}

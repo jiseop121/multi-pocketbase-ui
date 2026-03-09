@@ -28,8 +28,8 @@ to_formula_class() {
 
 VERSION=""
 GITHUB_REPO=""
-FORMULA_NAME="pocketbase-multiview"
-BINARY_NAME="pbviewer"
+FORMULA_NAME="pbdash"
+BINARY_NAME="pbdash"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -105,8 +105,8 @@ ARTIFACT_AMD64="${BINARY_NAME}-v${VERSION}-darwin-amd64.tar.gz"
 
 echo "==> build binaries"
 BUILD_FLAGS=(-trimpath -ldflags "-s -w -buildid=")
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/arm64/${BINARY_NAME}" ./cmd/pbviewer
-GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/amd64/${BINARY_NAME}" ./cmd/pbviewer
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/arm64/${BINARY_NAME}" ./cmd/pbdash
+GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/amd64/${BINARY_NAME}" ./cmd/pbdash
 touch -t 197001010000 "$WORKDIR/arm64/${BINARY_NAME}" "$WORKDIR/amd64/${BINARY_NAME}"
 
 (
@@ -125,7 +125,7 @@ FORMULA_PATH="Formula/${FORMULA_NAME}.rb"
 
 FORMULA_CONTENT=$(cat <<RUBY
 class ${FORMULA_CLASS} < Formula
-  desc "CLI tool for exploring multiple PocketBase instances"
+  desc "Read-only CLI viewer for PocketBase instances"
   homepage "https://github.com/${GITHUB_REPO}"
   version "${VERSION}"
 
@@ -171,7 +171,7 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   fi
 
   echo "==> brew smoke"
-  TAP_ALIAS="${GITHUB_REPO%%/*}/pocketbase-multiview"
+  TAP_ALIAS="${GITHUB_REPO%%/*}/pbdash"
   TAP_REMOTE="$(git remote get-url origin 2>/dev/null || true)"
   if [[ -z "$TAP_REMOTE" ]]; then
     TAP_REMOTE="https://github.com/${GITHUB_REPO}.git"

@@ -28,4 +28,4 @@ release-tag:
 
 release-brew:
 	@if [ -z "$(VERSION)" ]; then echo "VERSION is required. Example: make release-brew VERSION=0.2.1"; exit 1; fi
-	./scripts/release_brew_single_repo.sh --version "$(VERSION)" --github-repo "jiseop121/multi-pocketbase-ui"
+	./scripts/release_brew_single_repo.sh --version "$(VERSION)" --github-repo "jiseop121/pbdash"

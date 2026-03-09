@@ -1,6 +1,6 @@
 package app
 
-import "multi-pocketbase-ui/internal/apperr"
+import "github.com/jiseop121/pbdash/internal/apperr"
 
 type AppErrorKind = apperr.Kind
 

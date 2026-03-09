@@ -1,4 +1,4 @@
-module multi-pocketbase-ui
+module github.com/jiseop121/pbdash
 
 go 1.25.4
 

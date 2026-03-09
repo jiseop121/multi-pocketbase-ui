@@ -95,7 +95,7 @@ func TestRunREPLContinuesAfterCommandError(t *testing.T) {
 }
 
 func TestRunREPLStopsOnPrefixedExitCommand(t *testing.T) {
-	stdin := bytes.NewBufferString("version\npbviewer exit\nversion\n")
+	stdin := bytes.NewBufferString("version\npbdash exit\nversion\n")
 	stdout := bytes.NewBuffer(nil)
 	stderr := bytes.NewBuffer(nil)
 
@@ -136,7 +136,7 @@ func TestRunScriptContinuesAfterCommandError(t *testing.T) {
 }
 
 func TestRunScriptUsesLastErrorExitCode(t *testing.T) {
-	t.Setenv("PBVIEWER_HOME", t.TempDir())
+	t.Setenv("PBDASH_HOME", t.TempDir())
 
 	tempDir := t.TempDir()
 	scriptPath := filepath.Join(tempDir, "script.txt")
@@ -193,7 +193,7 @@ func TestRunScriptExitStopsFurtherCommands(t *testing.T) {
 
 func TestRunPrintsStartupErrorWhenSavedContextIsCorrupted(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("PBVIEWER_HOME", home)
+	t.Setenv("PBDASH_HOME", home)
 	contextPath := filepath.Join(home, "context.json")
 	if err := os.WriteFile(contextPath, []byte("{bad json"), 0o600); err != nil {
 		t.Fatalf("write broken context: %v", err)

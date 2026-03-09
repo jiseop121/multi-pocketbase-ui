@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"multi-pocketbase-ui/internal/apperr"
+	"github.com/jiseop121/pbdash/internal/apperr"
 )
 
 type ScriptLineExecutor func(lineNo int, line string) error

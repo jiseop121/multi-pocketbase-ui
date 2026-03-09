@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"multi-pocketbase-ui/internal/apperr"
+	"github.com/jiseop121/pbdash/internal/apperr"
 )
 
 func TestAPICSVRequiresOut(t *testing.T) {
@@ -125,7 +125,7 @@ func TestHelpIncludesCommandDescriptions(t *testing.T) {
 
 	out := buf.String()
 	required := []string{
-		"pbviewer command reference",
+		"pbdash command reference",
 		"Run modes:",
 		"Core commands:",
 		"DB commands:",

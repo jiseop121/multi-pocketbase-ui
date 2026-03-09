@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"multi-pocketbase-ui/internal/apperr"
-	"multi-pocketbase-ui/internal/pocketbase"
-	"multi-pocketbase-ui/internal/storage"
+	"github.com/jiseop121/pbdash/internal/apperr"
+	"github.com/jiseop121/pbdash/internal/pocketbase"
+	"github.com/jiseop121/pbdash/internal/storage"
 )
 
 type DispatcherConfig struct {
@@ -108,7 +108,7 @@ func (d *Dispatcher) Execute(ctx context.Context, line string) error {
 	if len(tokens) == 0 {
 		return nil
 	}
-	if tokens[0] == "pbviewer" {
+	if tokens[0] == "pbdash" {
 		tokens = tokens[1:]
 		if len(tokens) == 0 {
 			return nil
@@ -147,12 +147,12 @@ func argsAfterHead(tokens []string) []string {
 }
 
 func (d *Dispatcher) printHelp() {
-	help := strings.TrimSpace(`pbviewer command reference
+	help := strings.TrimSpace(`pbdash command reference
 
 Run modes:
-  pbviewer                         Start REPL mode.
-  pbviewer -c "<command>"          Run one command and exit.
-  pbviewer <script-file>           Execute commands from a script file.
+  pbdash                         Start REPL mode.
+  pbdash -c "<command>"          Run one command and exit.
+  pbdash <script-file>           Execute commands from a script file.
 
 Core commands:
   version                         Print CLI version.

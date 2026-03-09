@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"multi-pocketbase-ui/internal/apperr"
-	"multi-pocketbase-ui/internal/pocketbase"
-	"multi-pocketbase-ui/internal/storage"
+	"github.com/jiseop121/pbdash/internal/apperr"
+	"github.com/jiseop121/pbdash/internal/pocketbase"
+	"github.com/jiseop121/pbdash/internal/storage"
 )
 
 func newFlagSet(name string) *flag.FlagSet {
