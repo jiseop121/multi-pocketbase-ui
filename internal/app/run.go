@@ -11,7 +11,7 @@ import (
 	"github.com/jiseop121/pbdash/internal/cli"
 )
 
-const Version = "1.0.0"
+const Version = "0.4.0"
 
 type modeResult struct {
 	err             error

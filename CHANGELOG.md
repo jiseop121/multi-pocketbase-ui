@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.0] - 2026-03-09
+## [0.4.0] - 2026-03-09
 
 ### Changed
 - Rebranded project name to `PocketBase Dash` and renamed CLI binary/command to `pbdash`.
