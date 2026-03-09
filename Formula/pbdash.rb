@@ -1,15 +1,15 @@
 class Pbdash < Formula
   desc "Read-only CLI viewer for PocketBase instances"
   homepage "https://github.com/jiseop121/pbdash"
-  version "0.4.0"
+  version "0.4.1"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/jiseop121/pbdash/releases/download/v0.4.0/pbdash-v0.4.0-darwin-arm64.tar.gz"
-      sha256 "901742de6ea79aebc34c05606d65e5d6a5fc827acc494d1c54a58d9472ae4a8d"
+      url "https://github.com/jiseop121/pbdash/releases/download/v0.4.1/pbdash-v0.4.1-darwin-arm64.tar.gz"
+      sha256 "718981360eb8b5c4a00ba6193a33f78109aaec34a86d2a408921c0404ee85b6f"
     else
-      url "https://github.com/jiseop121/pbdash/releases/download/v0.4.0/pbdash-v0.4.0-darwin-amd64.tar.gz"
-      sha256 "2d667e8689816fc2986a54a5ca748b452b782a5a7a4d9ff9e5e6e749964bfac8"
+      url "https://github.com/jiseop121/pbdash/releases/download/v0.4.1/pbdash-v0.4.1-darwin-amd64.tar.gz"
+      sha256 "7aa34ec79cacf87798f0139ab00b5eed9e6e0f4182243f07605bb9a79f688ca6"
     end
   end
 
