@@ -8,6 +8,8 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/jiseop121/pbdash/internal/pocketbase"
 	"github.com/jiseop121/pbdash/internal/storage"
@@ -99,6 +101,33 @@ func TestRunRecordsTUIUsesNavigatorRunner(t *testing.T) {
 	if gotRoute.state.Collection != "posts" || gotRoute.state.Page != 2 {
 		t.Fatalf("state mismatch: %+v", gotRoute.state)
 	}
+}
+
+func TestNavigatorTUISetupViewsCapturesTableShortcuts(t *testing.T) {
+	ui := &navigatorTUI{
+		app:           tview.NewApplication(),
+		statusView:    tview.NewTextView(),
+		tableView:     tview.NewTable(),
+		detailView:    tview.NewTextView(),
+		helpView:      tview.NewTextView(),
+		screen:        screenRecords,
+		detailVisible: true,
+		observedCols:  map[string]struct{}{},
+		result: pocketbase.QueryResult{Rows: []map[string]any{
+			{"id": "1", "title": "first"},
+			{"id": "2", "title": "second"},
+		}},
+	}
+
+	ui.setupViews()
+	handler := ui.tableView.InputHandler()
+	require.NotNil(t, handler)
+
+	handler(tcell.NewEventKey(tcell.KeyRune, 'j', tcell.ModNone), func(tview.Primitive) {})
+	assert.Equal(t, 1, ui.selectedIndex)
+
+	handler(tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone), func(tview.Primitive) {})
+	assert.False(t, ui.detailVisible)
 }
 
 func queryResultWithColumns(count int) pocketbaseQueryResult {

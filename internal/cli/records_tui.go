@@ -15,7 +15,10 @@ import (
 	"github.com/jiseop121/pbdash/internal/storage"
 )
 
-const visibleColumnWindow = 8
+const (
+	visibleColumnWindow = 8
+	managerNewOption    = "<new>"
+)
 
 type navigatorScreen string
 
@@ -63,6 +66,19 @@ type navigatorTUI struct {
 	columnOffset  int
 	detailVisible bool
 	observedCols  map[string]struct{}
+	statusMessage string
+}
+
+type dbManagerState struct {
+	items         []storage.DB
+	selectedAlias string
+}
+
+type superuserManagerState struct {
+	dbs           []storage.DB
+	selectedDB    string
+	superusers    []storage.Superuser
+	selectedAlias string
 }
 
 func (d *Dispatcher) RunRecordsTUI(ctx context.Context, target pbTarget, state RecordsQueryState) error {
@@ -136,11 +152,13 @@ func (ui *navigatorTUI) bootstrap(route navigatorRoute) error {
 }
 
 func (ui *navigatorTUI) setupViews() {
+	ui.app.SetInputCapture(ui.handleKey)
 	ui.statusView.SetDynamicColors(true)
 
 	ui.tableView.SetBorders(false)
 	ui.tableView.SetSelectable(true, false)
 	ui.tableView.SetFixed(1, 0)
+	ui.tableView.SetInputCapture(ui.handleKey)
 	ui.tableView.SetSelectedStyle(tcell.StyleDefault.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite))
 	ui.tableView.SetSelectionChangedFunc(func(row, _ int) {
 		if row <= 0 {
@@ -234,6 +252,12 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 			ui.openColumnsModal()
 			return nil
 		}
+	case 'b':
+		ui.openDBManagerModal()
+		return nil
+	case 'u':
+		ui.openSuperuserManagerModal()
+		return nil
 	case 'r':
 		_ = ui.refreshCurrentScreen()
 		return nil
@@ -395,6 +419,7 @@ func (ui *navigatorTUI) pushScreen(next navigatorScreen) {
 	ui.screen = next
 	ui.selectedIndex = 0
 	ui.columnOffset = 0
+	ui.statusMessage = ""
 	ui.renderCurrentScreen()
 }
 
@@ -715,6 +740,9 @@ func (ui *navigatorTUI) statusText() string {
 			parts = append(parts, fmt.Sprintf("sort=%q", ui.recordsState.Sort))
 		}
 	}
+	if strings.TrimSpace(ui.statusMessage) != "" {
+		parts = append(parts, "status="+ui.statusMessage)
+	}
 	return strings.Join(parts, "  ")
 }
 
@@ -742,13 +770,13 @@ func (ui *navigatorTUI) breadcrumb() string {
 func (ui *navigatorTUI) helpText() string {
 	switch ui.screen {
 	case screenDBList:
-		return "q quit  j/k move  Enter select  r refresh"
+		return "q quit  j/k move  Enter select  b db aliases  u superusers  r refresh"
 	case screenSuperusers:
-		return "q quit  esc/backspace back  j/k move  Enter select  r refresh"
+		return "q quit  esc/backspace back  j/k move  Enter select  b db aliases  u superusers  r refresh"
 	case screenCollections:
-		return "q quit  esc/backspace back  j/k move  Enter select  r refresh"
+		return "q quit  esc/backspace back  j/k move  Enter select  b db aliases  u superusers  r refresh"
 	case screenRecords:
-		return "q quit  esc/backspace back  j/k move  h/l or <-/-> horiz  / filter  s sort  c columns  [/] page  g/G first/last  r refresh  Enter detail"
+		return "q quit  esc/backspace back  j/k move  h/l or <-/-> horiz  / filter  s sort  c columns  b db aliases  u superusers  [/] page  g/G first/last  r refresh  Enter detail"
 	default:
 		return "q quit"
 	}
@@ -853,6 +881,195 @@ func (ui *navigatorTUI) openColumnsModal() {
 	ui.app.SetFocus(form)
 }
 
+func (ui *navigatorTUI) openDBManagerModal() {
+	items, err := ui.dispatcher.dbStore.List()
+	if err != nil {
+		ui.showError(mapStoreError(err))
+		return
+	}
+
+	manager := dbManagerState{items: items}
+	form := tview.NewForm()
+	form.AddDropDown("target", dbManagerChoices(items), 0, nil)
+	form.AddInputField("alias", "", 0, nil, nil)
+	form.AddInputField("base url", "", 0, nil, nil)
+
+	dropdown := form.GetFormItem(0).(*tview.DropDown)
+	aliasField := form.GetFormItem(1).(*tview.InputField)
+	baseURLField := form.GetFormItem(2).(*tview.InputField)
+
+	applySelection := func(text string) {
+		manager.selectedAlias = normalizeManagerSelection(text)
+		db, ok := findDB(items, manager.selectedAlias)
+		if !ok {
+			aliasField.SetText("")
+			baseURLField.SetText("")
+			return
+		}
+		aliasField.SetText(db.Alias)
+		baseURLField.SetText(db.BaseURL)
+	}
+
+	dropdown.SetSelectedFunc(func(text string, _ int) {
+		applySelection(text)
+	})
+	applySelection(managerNewOption)
+
+	form.AddButton("Save", func() {
+		ui.closeModal("db-manager")
+		var saveErr error
+		if manager.selectedAlias == "" {
+			_, saveErr = ui.dispatcher.saveDBAlias(aliasField.GetText(), baseURLField.GetText())
+		} else {
+			_, saveErr = ui.dispatcher.updateDBAlias(manager.selectedAlias, aliasField.GetText(), baseURLField.GetText())
+		}
+		if saveErr != nil {
+			ui.showError(saveErr)
+			return
+		}
+		if err := ui.syncLocalConfigState(); err != nil {
+			ui.showError(err)
+			return
+		}
+		ui.statusMessage = "db aliases updated"
+		ui.renderCurrentScreen()
+	})
+	form.AddButton("Delete", func() {
+		if manager.selectedAlias == "" {
+			ui.showError(apperr.Invalid("Select an existing db alias first.", "Choose a saved db alias from the target field."))
+			return
+		}
+		ui.closeModal("db-manager")
+		if err := ui.dispatcher.removeDBAlias(manager.selectedAlias); err != nil {
+			ui.showError(err)
+			return
+		}
+		if err := ui.syncLocalConfigState(); err != nil {
+			ui.showError(err)
+			return
+		}
+		ui.statusMessage = dbDeleteStatus(ui.target.DB.Alias, manager.selectedAlias)
+		ui.renderCurrentScreen()
+	})
+	form.AddButton("Close", func() {
+		ui.closeModal("db-manager")
+	})
+	form.SetBorder(true).SetTitle(" DB Aliases ")
+	form.SetButtonsAlign(tview.AlignRight)
+
+	ui.modalOpen = true
+	ui.pages.AddPage("db-manager", center(76, 12, form), true, true)
+	ui.app.SetFocus(form)
+}
+
+func (ui *navigatorTUI) openSuperuserManagerModal() {
+	dbs, err := ui.dispatcher.dbStore.List()
+	if err != nil {
+		ui.showError(mapStoreError(err))
+		return
+	}
+	if len(dbs) == 0 {
+		ui.showError(apperr.Invalid("No db aliases are configured.", "Save a db alias before adding superusers."))
+		return
+	}
+
+	manager := newSuperuserManagerState(dbs, ui.target.DB.Alias)
+	if err := manager.loadSuperusers(ui.dispatcher); err != nil {
+		ui.showError(err)
+		return
+	}
+
+	form := tview.NewForm()
+	form.AddDropDown("db", dbAliasOptions(dbs), manager.selectedDBIndex(), nil)
+	form.AddDropDown("target", manager.aliasChoices(), 0, nil)
+	form.AddInputField("alias", "", 0, nil, nil)
+	form.AddInputField("email", "", 0, nil, nil)
+	form.AddPasswordField("password(blank=keep)", "", 0, '*', nil)
+
+	dbDropdown := form.GetFormItem(0).(*tview.DropDown)
+	targetDropdown := form.GetFormItem(1).(*tview.DropDown)
+	aliasField := form.GetFormItem(2).(*tview.InputField)
+	emailField := form.GetFormItem(3).(*tview.InputField)
+	passwordField := form.GetFormItem(4).(*tview.InputField)
+
+	applySelection := func(text string) {
+		manager.selectedAlias = normalizeManagerSelection(text)
+		su, ok := findSuperuser(manager.superusers, manager.selectedAlias)
+		if !ok {
+			aliasField.SetText("")
+			emailField.SetText("")
+			passwordField.SetText("")
+			return
+		}
+		aliasField.SetText(su.Alias)
+		emailField.SetText(su.Email)
+		passwordField.SetText("")
+	}
+
+	dbDropdown.SetSelectedFunc(func(text string, _ int) {
+		manager.selectedDB = text
+		if err := manager.loadSuperusers(ui.dispatcher); err != nil {
+			ui.showError(err)
+			return
+		}
+		targetDropdown.SetOptions(manager.aliasChoices(), func(option string, _ int) {
+			applySelection(option)
+		})
+		targetDropdown.SetCurrentOption(0)
+		applySelection(managerNewOption)
+	})
+	targetDropdown.SetSelectedFunc(func(text string, _ int) {
+		applySelection(text)
+	})
+	applySelection(managerNewOption)
+
+	form.AddButton("Save", func() {
+		ui.closeModal("superuser-manager")
+		var saveErr error
+		if manager.selectedAlias == "" {
+			_, saveErr = ui.dispatcher.saveSuperuser(manager.selectedDB, aliasField.GetText(), emailField.GetText(), passwordField.GetText())
+		} else {
+			_, saveErr = ui.dispatcher.updateSuperuser(manager.selectedDB, manager.selectedAlias, aliasField.GetText(), emailField.GetText(), passwordField.GetText())
+		}
+		if saveErr != nil {
+			ui.showError(saveErr)
+			return
+		}
+		if err := ui.syncLocalConfigState(); err != nil {
+			ui.showError(err)
+			return
+		}
+		ui.statusMessage = "superusers updated"
+		ui.renderCurrentScreen()
+	})
+	form.AddButton("Delete", func() {
+		if manager.selectedAlias == "" {
+			ui.showError(apperr.Invalid("Select an existing superuser first.", "Choose a saved superuser from the target field."))
+			return
+		}
+		ui.closeModal("superuser-manager")
+		if err := ui.dispatcher.removeSuperuser(manager.selectedDB, manager.selectedAlias); err != nil {
+			ui.showError(err)
+			return
+		}
+		if err := ui.syncLocalConfigState(); err != nil {
+			ui.showError(err)
+			return
+		}
+		ui.statusMessage = superuserDeleteStatus(ui.target, manager.selectedDB, manager.selectedAlias)
+		ui.renderCurrentScreen()
+	})
+	form.AddButton("Close", func() {
+		ui.closeModal("superuser-manager")
+	})
+	form.SetBorder(true).SetTitle(" Superusers ")
+	form.SetButtonsAlign(tview.AlignRight)
+
+	ui.modalOpen = true
+	ui.pages.AddPage("superuser-manager", center(80, 14, form), true, true)
+	ui.app.SetFocus(form)
+}
+
 func (ui *navigatorTUI) closeModal(name string) {
 	ui.pages.RemovePage(name)
 	ui.modalOpen = false
@@ -880,6 +1097,77 @@ func (ui *navigatorTUI) showError(err error) {
 
 	ui.pages.AddPage("error", center(80, 12, container), true, true)
 	ui.app.SetFocus(form)
+}
+
+func (ui *navigatorTUI) syncLocalConfigState() error {
+	if err := ui.loadDBs(); err != nil {
+		return err
+	}
+	if !ui.hasTarget {
+		return nil
+	}
+
+	db, found, err := ui.dispatcher.dbStore.Find(ui.target.DB.Alias)
+	if err != nil {
+		return mapStoreError(err)
+	}
+	if !found {
+		ui.resetToDBList()
+		return nil
+	}
+	ui.target.DB = db
+
+	if strings.TrimSpace(ui.target.SU.Alias) != "" {
+		su, found, err := ui.dispatcher.suStore.Find(db.Alias, ui.target.SU.Alias)
+		if err != nil {
+			return mapStoreError(err)
+		}
+		if found {
+			ui.target.SU = su
+		} else {
+			ui.target.SU = storage.Superuser{}
+			if ui.screen == screenCollections || ui.screen == screenRecords {
+				ui.screen = screenSuperusers
+				ui.history = []navigatorScreen{screenDBList}
+			}
+		}
+	}
+
+	switch ui.screen {
+	case screenSuperusers:
+		return ui.loadSuperusers()
+	case screenCollections:
+		if strings.TrimSpace(ui.target.SU.Alias) == "" {
+			ui.screen = screenSuperusers
+			return ui.loadSuperusers()
+		}
+		return ui.loadCollections()
+	case screenRecords:
+		if strings.TrimSpace(ui.target.SU.Alias) == "" {
+			ui.screen = screenSuperusers
+			return ui.loadSuperusers()
+		}
+		if err := ui.loadCollections(); err != nil {
+			return err
+		}
+		return ui.fetchRecords()
+	default:
+		return nil
+	}
+}
+
+func (ui *navigatorTUI) resetToDBList() {
+	ui.screen = screenDBList
+	ui.history = nil
+	ui.hasTarget = false
+	ui.target = pbTarget{}
+	ui.superusers = nil
+	ui.collections = nil
+	ui.result = pocketbase.QueryResult{}
+	ui.totalItems = 0
+	ui.totalPages = 0
+	ui.selectedIndex = 0
+	ui.columnOffset = 0
 }
 
 func center(width, height int, primitive tview.Primitive) tview.Primitive {
@@ -946,4 +1234,98 @@ func mergeColumns(observed map[string]struct{}, fresh []string) []string {
 		return cols[i] < cols[j]
 	})
 	return cols
+}
+
+func dbManagerChoices(items []storage.DB) []string {
+	return append([]string{managerNewOption}, dbAliasOptions(items)...)
+}
+
+func dbAliasOptions(items []storage.DB) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.Alias)
+	}
+	return out
+}
+
+func superuserAliasOptions(items []storage.Superuser) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.Alias)
+	}
+	return out
+}
+
+func newSuperuserManagerState(dbs []storage.DB, currentDB string) superuserManagerState {
+	selectedDB := currentDB
+	if indexDBAlias(dbs, currentDB) < 0 {
+		selectedDB = dbs[0].Alias
+	}
+	return superuserManagerState{dbs: dbs, selectedDB: selectedDB}
+}
+
+func (m *superuserManagerState) loadSuperusers(dispatcher *Dispatcher) error {
+	items, err := dispatcher.suStore.ListByDB(m.selectedDB)
+	if err != nil {
+		return mapStoreError(err)
+	}
+	m.superusers = items
+	m.selectedAlias = ""
+	return nil
+}
+
+func (m superuserManagerState) selectedDBIndex() int {
+	return indexDBAlias(m.dbs, m.selectedDB)
+}
+
+func (m superuserManagerState) aliasChoices() []string {
+	return append([]string{managerNewOption}, superuserAliasOptions(m.superusers)...)
+}
+
+func normalizeManagerSelection(value string) string {
+	if value == managerNewOption {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+func findDB(items []storage.DB, alias string) (storage.DB, bool) {
+	for _, item := range items {
+		if strings.EqualFold(item.Alias, alias) {
+			return item, true
+		}
+	}
+	return storage.DB{}, false
+}
+
+func findSuperuser(items []storage.Superuser, alias string) (storage.Superuser, bool) {
+	for _, item := range items {
+		if strings.EqualFold(item.Alias, alias) {
+			return item, true
+		}
+	}
+	return storage.Superuser{}, false
+}
+
+func indexDBAlias(items []storage.DB, alias string) int {
+	for i, item := range items {
+		if strings.EqualFold(item.Alias, alias) {
+			return i
+		}
+	}
+	return 0
+}
+
+func dbDeleteStatus(currentTargetAlias, deletedAlias string) string {
+	if strings.EqualFold(currentTargetAlias, deletedAlias) {
+		return "current db alias was removed from local config"
+	}
+	return "db aliases updated"
+}
+
+func superuserDeleteStatus(target pbTarget, deletedDBAlias, deletedAlias string) string {
+	if strings.EqualFold(target.DB.Alias, deletedDBAlias) && strings.EqualFold(target.SU.Alias, deletedAlias) {
+		return "current superuser alias was removed from local config"
+	}
+	return "superusers updated"
 }
