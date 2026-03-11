@@ -45,8 +45,9 @@ go test ./...
 - script 모드(`pbdash <script-file>`)
 
 사전 조건:
-- `pocketbase` 실행 파일이 PATH에 있어야 한다.
-- 다른 경로/이름이면 `POCKETBASE_BIN` 환경변수로 지정한다.
+- 기본값으로 `make e2e`는 PocketBase CLI가 없으면 `.tmp/tools/pocketbase/<version>/pocketbase`에 자동 다운로드한다.
+- 자동 다운로드한 zip은 PocketBase release의 `checksums.txt`와 대조해 SHA-256 검증 후에만 사용한다.
+- 이미 설치된 다른 바이너리를 쓰려면 `POCKETBASE_BIN` 환경변수로 지정한다. 절대/상대 경로뿐 아니라 PATH에 있는 명령 이름도 사용할 수 있다.
 
 실행:
 
@@ -58,9 +59,24 @@ make e2e
 POCKETBASE_BIN=/absolute/path/to/pocketbase make e2e
 ```
 
+필요하면 바이너리만 먼저 받아둘 수 있다.
+
+```bash
+make pocketbase-bin
+```
+
 ## 수동 PocketBase 실행 (디버깅)
+
+아래 타깃들도 기본값으로 PocketBase CLI를 자동 다운로드한 뒤 실행한다.
 
 ```bash
 make pocketbase-superuser PB_SUPERUSER_EMAIL=root@example.com PB_SUPERUSER_PASSWORD=pass123456
 make pocketbase-serve PB_HTTP=127.0.0.1:8090
+```
+
+짧은 별칭도 지원한다.
+
+```bash
+make pb-su PB_SUPERUSER_EMAIL=root@example.com PB_SUPERUSER_PASSWORD=pass123456
+make pb-serve PB_HTTP=127.0.0.1:8090
 ```
