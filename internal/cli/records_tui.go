@@ -231,7 +231,9 @@ func (ui *navigatorTUI) setupViews() {
 		} else {
 			ui.selectedIndex = row - 1
 		}
-		ui.renderDetail()
+		if ui.shouldShowDetailPane() {
+			ui.renderDetail()
+		}
 	})
 
 	ui.detailView.SetTextAlign(tview.AlignLeft)
@@ -555,7 +557,6 @@ func (ui *navigatorTUI) activateSelectedCollection() error {
 		return apperr.RuntimeErr("Could not determine collection name.", "", nil)
 	}
 	ui.recordsState = RecordsQueryState{Collection: name, Page: 1}
-	ui.detailVisible = false
 	ui.recordDetail = nil
 	ui.observedCols = map[string]struct{}{}
 	if err := ui.fetchRecords(); err != nil {
