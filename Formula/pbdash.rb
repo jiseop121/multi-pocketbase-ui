@@ -1,7 +1,7 @@
 class Pbdash < Formula
   desc "Read-only CLI viewer for PocketBase instances"
   homepage "https://github.com/jiseop121/pbdash"
-  version "0.4.1"
+  version "0.5.0"
 
   on_macos do
     if Hardware::CPU.arm?
