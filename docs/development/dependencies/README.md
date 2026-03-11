@@ -18,9 +18,11 @@
   - `Application`, `Pages`, `Flex`, `Table`, `TextView` 중심으로 화면을 구성한다.
   - DB 목록, superuser 선택, collection 목록, records 테이블을 한 개의 navigator 흐름으로 조합한다.
   - 상세 패널, 상태바, 도움말 라인을 모두 `tview` primitive로 렌더링한다.
+  - 폼/모달 입력은 공통 포커스 이동 규칙과 모달별 단축키(`Enter` 적용, `Esc` 취소, 컬럼 선택은 `Space` 토글)를 함께 사용한다.
 - 주의사항
   - 레이아웃/포커스 처리 변경은 키 입력 동작과 함께 깨지기 쉽다.
   - `setupViews()`와 `handleKey()`는 항상 같이 검토한다.
+  - `installFormArrowNavigation`, `installSubmitCancelNavigation` 같이 모달 입력 규칙을 묶는 헬퍼도 함께 확인한다.
   - 업그레이드 후에는 records TUI 관련 테스트를 먼저 확인한다.
 
 ### `github.com/gdamore/tcell/v2`

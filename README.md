@@ -61,6 +61,10 @@ pbdash -c "api records --db local --superuser root --collection posts --page 1 -
 
 기본 실행은 전면 TUI다.
 탐색 흐름은 `DB 목록 -> (필요 시 superuser 선택) -> collections -> records table` 순서다.
+기본 탐색은 `j/k` 또는 화살표키로 이동한다.
+`q`는 종료, `Esc`/`Backspace`는 이전 화면으로 돌아간다.
+컬럼 선택 모달(`c`)에서는 `Space`로 컬럼을 토글하고 `Enter`로 적용, `Esc`로 취소한다.
+필터 모달(`/`)에서는 `Enter`로 적용하고 `Esc`로 취소한다.
 
 ```bash
 pbdash

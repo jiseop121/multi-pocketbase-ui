@@ -128,6 +128,34 @@ func TestNavigatorTUIRenderCurrentScreenRestoresMainFocus(t *testing.T) {
 	assert.Same(t, ui.tableView, ui.app.GetFocus())
 }
 
+func TestNavigatorTUIGlobalQuitWorksOutsideTableFocus(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	stopped := false
+	ui.stop = func() {
+		stopped = true
+	}
+	ui.setupViews()
+	ui.app.SetFocus(ui.detailView)
+
+	got := ui.handleGlobalKey(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone))
+
+	require.Nil(t, got)
+	assert.True(t, stopped)
+}
+
+func TestNavigatorTUIGlobalBackWorksOutsideTableFocus(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.setupViews()
+	ui.pushScreen(screenCollections)
+	ui.pushScreen(screenRecords)
+	ui.app.SetFocus(ui.detailView)
+
+	got := ui.handleGlobalKey(tcell.NewEventKey(tcell.KeyEsc, 0, tcell.ModNone))
+
+	require.Nil(t, got)
+	assert.Equal(t, screenCollections, ui.screen)
+}
+
 func TestNavigatorTUIPushAndBackRestoreMainFocus(t *testing.T) {
 	ui := newTestNavigatorTUI()
 	ui.setupViews()
@@ -184,6 +212,112 @@ func TestNavigatorTUIRefreshShortcutRestoresMainFocus(t *testing.T) {
 	assert.Same(t, ui.tableView, ui.app.GetFocus())
 }
 
+func TestNavigatorTUICollectionScreenShowsNames(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.screen = screenCollections
+	ui.collections = []map[string]any{
+		{"id": "col_posts", "name": "posts", "type": "base"},
+		{"id": "col_logs", "type": "view"},
+	}
+
+	ui.renderTable()
+
+	require.Equal(t, "NAME", ui.tableView.GetCell(0, 0).Text)
+	assert.Equal(t, "posts", ui.tableView.GetCell(1, 0).Text)
+	assert.Equal(t, "col_logs", ui.tableView.GetCell(2, 0).Text)
+
+	row, ok := ui.selectedRow()
+	require.True(t, ok)
+	assert.Equal(t, "posts", row["name"])
+	assert.Equal(t, "col_posts", row["id"])
+	assert.Equal(t, "base", row["type"])
+}
+
+func TestRemapFormArrowNavigationInputFieldUsesVerticalOnly(t *testing.T) {
+	field := tview.NewInputField()
+
+	up := remapFormArrowNavigation(field, tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone))
+	down := remapFormArrowNavigation(field, tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone))
+	left := remapFormArrowNavigation(field, tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone))
+	right := remapFormArrowNavigation(field, tcell.NewEventKey(tcell.KeyRight, 0, tcell.ModNone))
+
+	require.Equal(t, tcell.KeyBacktab, up.Key())
+	require.Equal(t, tcell.KeyTab, down.Key())
+	require.Equal(t, tcell.KeyLeft, left.Key())
+	require.Equal(t, tcell.KeyRight, right.Key())
+}
+
+func TestRemapFormArrowNavigationDropdownUsesAllArrowsWhenClosed(t *testing.T) {
+	dropdown := tview.NewDropDown().SetOptions([]string{"one", "two"}, nil)
+
+	left := remapFormArrowNavigation(dropdown, tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone))
+	right := remapFormArrowNavigation(dropdown, tcell.NewEventKey(tcell.KeyRight, 0, tcell.ModNone))
+	up := remapFormArrowNavigation(dropdown, tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone))
+	down := remapFormArrowNavigation(dropdown, tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone))
+
+	require.Equal(t, tcell.KeyBacktab, left.Key())
+	require.Equal(t, tcell.KeyTab, right.Key())
+	require.Equal(t, tcell.KeyBacktab, up.Key())
+	require.Equal(t, tcell.KeyTab, down.Key())
+}
+
+func TestRemapFormArrowNavigationDropdownPreservesOpenListKeys(t *testing.T) {
+	dropdown := tview.NewDropDown().SetOptions([]string{"one", "two"}, nil)
+	setFocus := func(p tview.Primitive) {}
+	dropdown.InputHandler()(tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone), setFocus)
+	require.True(t, dropdown.IsOpen())
+
+	up := remapFormArrowNavigation(dropdown, tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone))
+	down := remapFormArrowNavigation(dropdown, tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone))
+
+	require.Equal(t, tcell.KeyUp, up.Key())
+	require.Equal(t, tcell.KeyDown, down.Key())
+}
+
+func TestRemapFormArrowNavigationCheckboxAndButtonUseAllArrows(t *testing.T) {
+	checkbox := tview.NewCheckbox()
+	button := tview.NewButton("OK")
+
+	require.Equal(t, tcell.KeyBacktab, remapFormArrowNavigation(checkbox, tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone)).Key())
+	require.Equal(t, tcell.KeyTab, remapFormArrowNavigation(checkbox, tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)).Key())
+	require.Equal(t, tcell.KeyBacktab, remapFormArrowNavigation(button, tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)).Key())
+	require.Equal(t, tcell.KeyTab, remapFormArrowNavigation(button, tcell.NewEventKey(tcell.KeyRight, 0, tcell.ModNone)).Key())
+}
+
+func TestRemapSubmitCancelNavigationUsesEnterAndEsc(t *testing.T) {
+	checkbox := tview.NewCheckbox()
+	applied := false
+	cancelled := false
+
+	enter := remapSubmitCancelNavigation(checkbox, tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone), func() {
+		applied = true
+	}, func() {
+		cancelled = true
+	})
+	require.Nil(t, enter)
+	assert.True(t, applied)
+	assert.False(t, cancelled)
+	assert.False(t, checkbox.IsChecked())
+
+	cancelled = false
+	esc := remapSubmitCancelNavigation(checkbox, tcell.NewEventKey(tcell.KeyEsc, 0, tcell.ModNone), nil, func() {
+		cancelled = true
+	})
+	require.Nil(t, esc)
+	assert.True(t, cancelled)
+}
+
+func TestRemapSubmitCancelNavigationPreservesSpaceAndArrowKeys(t *testing.T) {
+	checkbox := tview.NewCheckbox()
+
+	space := remapSubmitCancelNavigation(checkbox, tcell.NewEventKey(tcell.KeyRune, ' ', tcell.ModNone), nil, nil)
+	left := remapSubmitCancelNavigation(checkbox, tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone), nil, nil)
+
+	require.Equal(t, tcell.KeyRune, space.Key())
+	assert.Equal(t, ' ', space.Rune())
+	require.Equal(t, tcell.KeyBacktab, left.Key())
+}
+
 func TestNavigatorTUIHandleKeyManagerShortcutsAndQuit(t *testing.T) {
 	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
 	_, err := dispatcher.saveDBAlias("dev", "http://127.0.0.1:8090")
@@ -213,7 +347,7 @@ func TestNavigatorTUIHandleKeyManagerShortcutsAndQuit(t *testing.T) {
 	assert.True(t, ui.pages.HasPage("superuser-manager"))
 	ui.closeModal("superuser-manager")
 
-	handler(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone), func(tview.Primitive) {})
+	ui.handleGlobalKey(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone))
 	assert.True(t, stopped)
 }
 

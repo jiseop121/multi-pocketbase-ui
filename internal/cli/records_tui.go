@@ -212,6 +212,7 @@ func (ui *navigatorTUI) bootstrap(route navigatorRoute) error {
 
 func (ui *navigatorTUI) setupViews() {
 	ui.statusView.SetDynamicColors(true)
+	ui.app.SetInputCapture(ui.handleGlobalKey)
 
 	ui.tableView.SetBorders(false)
 	ui.tableView.SetSelectable(true, false)
@@ -242,8 +243,8 @@ func (ui *navigatorTUI) setupViews() {
 	ui.renderCurrentScreen()
 }
 
-func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
-	if ui.modalOpen {
+func (ui *navigatorTUI) handleGlobalKey(event *tcell.EventKey) *tcell.EventKey {
+	if ui.modalOpen || event == nil {
 		return event
 	}
 
@@ -251,6 +252,22 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 	case tcell.KeyEsc, tcell.KeyBackspace, tcell.KeyBackspace2:
 		ui.goBack()
 		return nil
+	}
+
+	if event.Rune() == 'q' {
+		ui.stopApplication()
+		return nil
+	}
+
+	return event
+}
+
+func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
+	if ui.modalOpen {
+		return event
+	}
+
+	switch event.Key() {
 	case tcell.KeyEnter:
 		ui.handleEnter()
 		return nil
@@ -267,9 +284,6 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 	}
 
 	switch event.Rune() {
-	case 'q':
-		ui.stopApplication()
-		return nil
 	case 'j':
 		ui.moveSelection(1)
 		return nil
@@ -288,11 +302,7 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 		}
 	case '/':
 		if ui.screen == screenRecords {
-			ui.openInputModal("Filter", "filter", ui.recordsState.Filter, func(val string) error {
-				ui.recordsState.Filter = strings.TrimSpace(val)
-				ui.recordsState.Page = 1
-				return ui.fetchAndRenderRecords()
-			})
+			ui.openFilterModal()
 			return nil
 		}
 	case 's':
@@ -344,6 +354,14 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 	return event
+}
+
+func (ui *navigatorTUI) openFilterModal() {
+	ui.openSubmitCancelInputModal("Filter", "filter", ui.recordsState.Filter, func(val string) error {
+		ui.recordsState.Filter = strings.TrimSpace(val)
+		ui.recordsState.Page = 1
+		return ui.fetchAndRenderRecords()
+	})
 }
 
 func (ui *navigatorTUI) handleEnter() {
@@ -568,11 +586,7 @@ func (ui *navigatorTUI) currentColumns() []string {
 	case screenSuperusers:
 		return []string{"superuser_alias", "email"}
 	case screenCollections:
-		cols := pocketbase.CollectColumns(ui.collectionRows())
-		if len(cols) == 0 {
-			return []string{"result"}
-		}
-		return cols
+		return []string{"name"}
 	case screenRecords:
 		if len(ui.recordsState.Fields) > 0 {
 			return ui.recordsState.Fields
@@ -625,7 +639,16 @@ func (ui *navigatorTUI) superuserRows() []map[string]any {
 }
 
 func (ui *navigatorTUI) collectionRows() []map[string]any {
-	return ui.collections
+	rows := make([]map[string]any, 0, len(ui.collections))
+	for _, item := range ui.collections {
+		row := make(map[string]any, len(item)+1)
+		for key, value := range item {
+			row[key] = value
+		}
+		row["name"] = collectionName(item)
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 func (ui *navigatorTUI) visibleColumns() []string {
@@ -871,8 +894,29 @@ func (ui *navigatorTUI) openInputModal(title, label, current string, apply func(
 	})
 	form.SetBorder(true).SetTitle(" " + title + " ")
 	form.SetButtonsAlign(tview.AlignRight)
+	installFormArrowNavigation(form)
 
 	modal := center(60, 9, form)
+	ui.pages.AddPage("input", modal, true, true)
+	ui.app.SetFocus(form)
+}
+
+func (ui *navigatorTUI) openSubmitCancelInputModal(title, label, current string, apply func(string) error) {
+	ui.modalOpen = true
+	form := tview.NewForm()
+	form.AddInputField(label, current, 0, nil, nil)
+	form.SetBorder(true).SetTitle(" " + title + " ")
+	installSubmitCancelNavigation(form, func() {
+		value := form.GetFormItem(0).(*tview.InputField).GetText()
+		ui.closeModal("input")
+		if err := apply(value); err != nil {
+			ui.showError(err)
+		}
+	}, func() {
+		ui.closeModal("input")
+	})
+
+	modal := center(60, 7, form)
 	ui.pages.AddPage("input", modal, true, true)
 	ui.app.SetFocus(form)
 }
@@ -903,7 +947,7 @@ func (ui *navigatorTUI) openColumnsModal() {
 			selected[name] = checked
 		})
 	}
-	form.AddButton("Apply", func() {
+	installSubmitCancelNavigation(form, func() {
 		picked := make([]string, 0, len(selected))
 		for _, col := range cols {
 			if selected[col] {
@@ -918,19 +962,12 @@ func (ui *navigatorTUI) openColumnsModal() {
 		ui.recordsState.Page = 1
 		ui.closeModal("columns")
 		_ = ui.fetchAndRenderRecords()
-	})
-	form.AddButton("Clear", func() {
-		ui.recordsState.Fields = nil
-		ui.recordsState.Page = 1
-		ui.closeModal("columns")
-		_ = ui.fetchAndRenderRecords()
-	})
-	form.AddButton("Cancel", func() {
+	}, func() {
 		ui.closeModal("columns")
 	})
 	form.SetBorder(true).SetTitle(" Columns ")
 
-	height := len(cols) + 6
+	height := len(cols) + 3
 	if height > 24 {
 		height = 24
 	}
@@ -972,6 +1009,7 @@ func (ui *navigatorTUI) openDBManagerModal() {
 	})
 	form.SetBorder(true).SetTitle(" DB Aliases ")
 	form.SetButtonsAlign(tview.AlignRight)
+	installFormArrowNavigation(form)
 
 	ui.modalOpen = true
 	ui.pages.AddPage("db-manager", center(76, 12, form), true, true)
@@ -1036,6 +1074,7 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 	})
 	form.SetBorder(true).SetTitle(" Superusers ")
 	form.SetButtonsAlign(tview.AlignRight)
+	installFormArrowNavigation(form)
 
 	ui.modalOpen = true
 	ui.pages.AddPage("superuser-manager", center(80, 14, form), true, true)
@@ -1117,6 +1156,7 @@ func (ui *navigatorTUI) showError(err error) {
 		ui.dismissErrorModal()
 	})
 	form.SetButtonsAlign(tview.AlignCenter)
+	installFormArrowNavigation(form)
 	container := tview.NewFlex().SetDirection(tview.FlexRow)
 	container.AddItem(text, 0, 1, false)
 	container.AddItem(form, 3, 0, true)
@@ -1323,6 +1363,90 @@ func collectionName(row map[string]any) string {
 		return name
 	}
 	return strings.TrimSpace(formatValue(row["id"]))
+}
+
+func installFormArrowNavigation(form *tview.Form) {
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		return remapFormArrowNavigation(currentFormPrimitive(form), event)
+	})
+}
+
+func installSubmitCancelNavigation(form *tview.Form, apply, cancel func()) {
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		return remapSubmitCancelNavigation(currentFormPrimitive(form), event, apply, cancel)
+	})
+}
+
+func currentFormPrimitive(form *tview.Form) tview.Primitive {
+	if form == nil {
+		return nil
+	}
+	if itemIndex, buttonIndex := form.GetFocusedItemIndex(); itemIndex >= 0 {
+		return form.GetFormItem(itemIndex)
+	} else if buttonIndex >= 0 {
+		return form.GetButton(buttonIndex)
+	}
+	return nil
+}
+
+func remapFormArrowNavigation(focused tview.Primitive, event *tcell.EventKey) *tcell.EventKey {
+	if event == nil {
+		return nil
+	}
+
+	switch item := focused.(type) {
+	case *tview.InputField:
+		switch event.Key() {
+		case tcell.KeyUp:
+			return tcell.NewEventKey(tcell.KeyBacktab, 0, tcell.ModNone)
+		case tcell.KeyDown:
+			return tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone)
+		default:
+			return event
+		}
+	case *tview.DropDown:
+		if item.IsOpen() {
+			return event
+		}
+		switch event.Key() {
+		case tcell.KeyUp, tcell.KeyLeft:
+			return tcell.NewEventKey(tcell.KeyBacktab, 0, tcell.ModNone)
+		case tcell.KeyDown, tcell.KeyRight:
+			return tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone)
+		default:
+			return event
+		}
+	default:
+		switch event.Key() {
+		case tcell.KeyUp, tcell.KeyLeft:
+			return tcell.NewEventKey(tcell.KeyBacktab, 0, tcell.ModNone)
+		case tcell.KeyDown, tcell.KeyRight:
+			return tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone)
+		default:
+			return event
+		}
+	}
+}
+
+func remapSubmitCancelNavigation(focused tview.Primitive, event *tcell.EventKey, apply, cancel func()) *tcell.EventKey {
+	if event == nil {
+		return nil
+	}
+
+	switch event.Key() {
+	case tcell.KeyEnter:
+		if apply != nil {
+			apply()
+		}
+		return nil
+	case tcell.KeyEsc:
+		if cancel != nil {
+			cancel()
+		}
+		return nil
+	default:
+		return remapFormArrowNavigation(focused, event)
+	}
 }
 
 func mergeColumns(observed map[string]struct{}, fresh []string) []string {
