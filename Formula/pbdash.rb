@@ -5,11 +5,11 @@ class Pbdash < Formula
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/jiseop121/pbdash/releases/download/v0.4.1/pbdash-v0.4.1-darwin-arm64.tar.gz"
-      sha256 "718981360eb8b5c4a00ba6193a33f78109aaec34a86d2a408921c0404ee85b6f"
+      url "https://github.com/jiseop121/pbdash/releases/download/v0.5.0/pbdash-v0.5.0-darwin-arm64.tar.gz"
+      sha256 "abdc474359718ed69bfb15977307be2dbf280bbe574f7eb92e212e5a41a5cf3d"
     else
-      url "https://github.com/jiseop121/pbdash/releases/download/v0.4.1/pbdash-v0.4.1-darwin-amd64.tar.gz"
-      sha256 "7aa34ec79cacf87798f0139ab00b5eed9e6e0f4182243f07605bb9a79f688ca6"
+      url "https://github.com/jiseop121/pbdash/releases/download/v0.5.0/pbdash-v0.5.0-darwin-amd64.tar.gz"
+      sha256 "b8e7bc2f6a269253f38207b2d0502b911ba58aa1eccf08da5c02a58e13b4c195"
     end
   end
 
