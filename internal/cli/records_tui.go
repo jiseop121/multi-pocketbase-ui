@@ -23,10 +23,10 @@ const (
 type navigatorScreen string
 
 const (
-	screenDBList      navigatorScreen = "dbs"
-	screenSuperusers  navigatorScreen = "superusers"
-	screenCollections navigatorScreen = "collections"
-	screenRecords     navigatorScreen = "records"
+	screenDBList       navigatorScreen = "dbs"
+	screenSuperusers   navigatorScreen = "superusers"
+	screenCollections  navigatorScreen = "collections"
+	screenRecords      navigatorScreen = "records"
 	screenRecordDetail navigatorScreen = "record-detail"
 )
 
@@ -41,10 +41,10 @@ type navigatorTUI struct {
 	dispatcher *Dispatcher
 	ctx        context.Context
 
-	app    *tview.Application
-	stop   func()
-	pages  *tview.Pages
-	layout *tview.Flex
+	app        *tview.Application
+	stop       func()
+	pages      *tview.Pages
+	layout     *tview.Flex
 	termScreen tcell.Screen
 
 	statusView *tview.TextView
@@ -269,6 +269,14 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 	if ui.consumeNavigationKey(event.Key()) {
 		return nil
 	}
+	if ui.isRecordDetailScreen() {
+		switch event.Rune() {
+		case 'j':
+			return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
+		case 'k':
+			return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
+		}
+	}
 	if ui.consumeRuneCommand(event.Rune()) {
 		return nil
 	}
@@ -463,11 +471,15 @@ func (ui *navigatorTUI) goBack() {
 		ui.app.Stop()
 		return
 	}
+	fromScreen := ui.screen
 	last := ui.history[len(ui.history)-1]
 	ui.history = ui.history[:len(ui.history)-1]
 	ui.screen = last
-	ui.selectedIndex = 0
+	if !(fromScreen == screenRecordDetail && last == screenRecords) {
+		ui.selectedIndex = 0
+	}
 	ui.columnOffset = 0
+	ui.statusMessage = ""
 	ui.renderCurrentScreen()
 }
 
@@ -578,8 +590,10 @@ func (ui *navigatorTUI) activateSelectedRecordDetail() error {
 func (ui *navigatorTUI) pushScreen(next navigatorScreen) {
 	ui.history = append(ui.history, ui.screen)
 	ui.screen = next
-	ui.selectedIndex = 0
-	ui.columnOffset = 0
+	if next != screenRecordDetail {
+		ui.selectedIndex = 0
+		ui.columnOffset = 0
+	}
 	ui.statusMessage = ""
 	ui.renderCurrentScreen()
 }

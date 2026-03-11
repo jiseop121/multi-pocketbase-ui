@@ -75,11 +75,13 @@ func TestNavigatorTUISimulationOpensSelectedRecordDetail(t *testing.T) {
 	h.injectKey(tcell.KeyEnter)
 	h.waitForText(`"detail_token": "detail-second"`, "y copy", "record")
 	assert.Equal(t, screenRecordDetail, h.ui.screen)
+	assert.Equal(t, 1, h.ui.selectedIndex)
 
 	h.injectKey(tcell.KeyEsc)
 	h.waitForText("ID", "TITLE")
 	h.waitForMissing(`"detail_token": "detail-second"`)
 	assert.Equal(t, screenRecords, h.ui.screen)
+	assert.Equal(t, 1, h.ui.selectedIndex)
 }
 
 func TestNavigatorTUISimulationCopiesRecordDetail(t *testing.T) {

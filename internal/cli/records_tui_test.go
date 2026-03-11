@@ -254,6 +254,48 @@ func TestNavigatorTUICopyRecordDetailWritesClipboard(t *testing.T) {
 	assert.Equal(t, "copied", ui.statusMessage)
 }
 
+func TestNavigatorTUIGoBackFromRecordDetailPreservesSelectedIndex(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.setupViews()
+	ui.result = pocketbase.QueryResult{Rows: []map[string]any{
+		{"id": "1"}, {"id": "2"}, {"id": "3"},
+	}}
+	ui.screen = screenRecords
+	ui.selectedIndex = 2
+	ui.recordDetail = map[string]any{"id": "3"}
+	ui.pushScreen(screenRecordDetail)
+
+	ui.goBack()
+
+	assert.Equal(t, screenRecords, ui.screen)
+	assert.Equal(t, 2, ui.selectedIndex)
+}
+
+func TestNavigatorTUIGoBackClearsStatusMessage(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.setupViews()
+	ui.pushScreen(screenCollections)
+	ui.statusMessage = "copied"
+
+	ui.goBack()
+
+	assert.Empty(t, ui.statusMessage)
+}
+
+func TestNavigatorTUIHandleKeyRemapsJKToArrowsOnDetailScreen(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.setupViews()
+	ui.screen = screenRecordDetail
+
+	downEvent := ui.handleKey(tcell.NewEventKey(tcell.KeyRune, 'j', tcell.ModNone))
+	upEvent := ui.handleKey(tcell.NewEventKey(tcell.KeyRune, 'k', tcell.ModNone))
+
+	require.NotNil(t, downEvent)
+	assert.Equal(t, tcell.KeyDown, downEvent.Key())
+	require.NotNil(t, upEvent)
+	assert.Equal(t, tcell.KeyUp, upEvent.Key())
+}
+
 func TestRemapFormArrowNavigationInputFieldUsesVerticalOnly(t *testing.T) {
 	field := tview.NewInputField()
 
