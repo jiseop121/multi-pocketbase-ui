@@ -269,18 +269,26 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 	if ui.consumeNavigationKey(event.Key()) {
 		return nil
 	}
-	if ui.isRecordDetailScreen() {
-		switch event.Rune() {
-		case 'j':
-			return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
-		case 'k':
-			return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
-		}
+	if remapped := ui.remapDetailScrollKey(event); remapped != event {
+		return remapped
 	}
 	if ui.consumeRuneCommand(event.Rune()) {
 		return nil
 	}
 
+	return event
+}
+
+func (ui *navigatorTUI) remapDetailScrollKey(event *tcell.EventKey) *tcell.EventKey {
+	if !ui.isRecordDetailScreen() {
+		return event
+	}
+	switch event.Rune() {
+	case 'j':
+		return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
+	case 'k':
+		return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
+	}
 	return event
 }
 
@@ -475,7 +483,9 @@ func (ui *navigatorTUI) goBack() {
 	last := ui.history[len(ui.history)-1]
 	ui.history = ui.history[:len(ui.history)-1]
 	ui.screen = last
-	if !(fromScreen == screenRecordDetail && last == screenRecords) {
+	if fromScreen == screenRecordDetail && last == screenRecords {
+		// preserve selectedIndex so the user returns to the same row
+	} else {
 		ui.selectedIndex = 0
 	}
 	ui.columnOffset = 0
