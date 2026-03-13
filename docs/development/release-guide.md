@@ -1,12 +1,12 @@
 # Release Guide
 
-이 문서는 `pbdash` 유지보수자가 태그 릴리스와 Homebrew 배포를 진행할 때 필요한 공개 절차를 정리한다.
+이 문서는 `pbdash` 유지보수자가 릴리스를 진행할 때 필요한 절차를 정리한다.
 
 ## 범위
 
-- 태그 생성과 GitHub Release 발행
-- Homebrew 배포 아티팩트 업로드
-- `Formula/pbdash.rb` 갱신
+- 태그 생성
+- GitHub Release 발행 (GoReleaser 자동)
+- Homebrew tap 갱신 (GoReleaser 자동)
 - 기본 검증 순서
 
 정책 판단 기준, 버전 해석, 금지사항은 `AGENTS.md`의 릴리스 섹션을 따른다. 이 문서는 실제 실행 절차만 다룬다.
@@ -14,106 +14,111 @@
 ## 입력 형식
 
 - `make release-tag`에는 `v` 없이 `x.y.z` 형식으로 넘긴다.
-- 실제 태그 이름은 `v0.4.1`처럼 `v` 접두어가 붙는다.
+- 실제 태그 이름은 `v0.7.0`처럼 `v` 접두어가 붙는다.
+
+## 사전 준비 (최초 1회)
+
+### 1. `jiseop121/homebrew-pbdash` 탭 레포 생성
+
+GoReleaser가 Formula를 별도 탭 레포에 커밋한다. 없으면 릴리스 시 실패한다.
+
+```
+GitHub → New repository → jiseop121/homebrew-pbdash
+설명: Homebrew tap for pbdash
+Public, README 없이 빈 레포로 생성
+```
+
+### 2. `HOMEBREW_TAP_TOKEN` 시크릿 등록
+
+GoReleaser는 `GITHUB_TOKEN`으로 이 레포의 Release는 업로드하지만,
+다른 레포(`homebrew-pbdash`)에 커밋하려면 별도 PAT가 필요하다.
+
+1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
+2. 토큰 이름: `homebrew-tap-writer`
+3. Repository access: `jiseop121/homebrew-pbdash` 선택
+4. Permissions: `Contents → Read and write`
+5. 생성 후 복사
+6. `jiseop121/pbdash` 레포 → Settings → Secrets and variables → Actions → `HOMEBREW_TAP_TOKEN` 추가
 
 ## 머지 전 준비
 
 릴리즈 대상 변경은 PR 머지 전에 아래를 먼저 끝낸다.
 
 1. 최신 태그 또는 최신 GitHub Release 기준으로 다음 버전을 확정한다.
-2. 버전 관련 파일을 그 다음 버전으로 먼저 올린다.
-3. `go test ./...`와 `pbdash -c "version"` 기준으로 버전 불일치가 없는지 확인한다.
-4. 태그 릴리즈 노트 초안을 `docs/development/release-note-template.md` 템플릿으로 준비한다.
-5. 위 상태 그대로 PR을 머지한다.
+2. `go test ./...`와 `go build -ldflags "-X github.com/jiseop121/pbdash/internal/app.Version=x.y.z" ./cmd/pbdash && ./pbdash -c "version"` 기준으로 버전 주입이 동작하는지 확인한다.
+3. 위 상태 그대로 PR을 머지한다.
 
-버전 관련 파일 최소 범위:
-
-- `internal/app/run.go`의 앱 버전 상수
-- `Formula/pbdash.rb`의 version 문자열
-
-다른 버전 표기 파일이 추가되면 같은 PR에서 함께 맞춘다.
+> `internal/app/run.go`의 `var Version = "dev"`는 수동으로 바꾸지 않는다. GoReleaser가 빌드 시 `-X` 플래그로 실제 버전을 주입한다.
 
 ## 머지 금지 정책
 
 아래 중 하나라도 빠지면 릴리즈 대상 PR은 머지하지 않는다.
 
 1. 다음 버전이 최신 태그 기준으로 확정되지 않음
-2. 버전 관련 파일이 다음 버전으로 올라가 있지 않음
-3. `go test ./...` 검증이 끝나지 않음
-4. GitHub Release 본문에 옮길 릴리즈 노트 초안이 준비되지 않음
-5. PR 본문에 릴리즈 영향 범위와 롤백 관점이 비어 있음
+2. `go test ./...` 검증이 끝나지 않음
+3. PR 본문에 릴리즈 영향 범위와 롤백 관점이 비어 있음
 
-위 항목이 미완료이면:
-
-- PR 상태는 Ready로 올리지 않는다.
-- 머지는 하지 않는다.
-- 누락 항목을 같은 PR 안에서 먼저 보완한다.
-
-예외 처리:
-
-- 이미 머지된 뒤 누락을 발견하면, 태그 생성 전에 즉시 후속 PR 또는 직접 보완 커밋으로 릴리즈 노트 초안을 복구한다.
-- 태그 생성 이후에 누락을 발견하면, GitHub Release 수동 보완 여부를 사용자 요청으로 확인한 뒤 진행한다.
-
-## 태그 릴리스
+## 새 릴리스 절차
 
 ```bash
-make release-tag VERSION=0.4.1
+# 1. main 브랜치가 clean 상태인지 확인
+git status --short
+
+# 2. 태그 생성 및 푸시
+make release-tag VERSION=x.y.z
 ```
 
-이 명령은 다음 순서로 동작한다.
+태그가 푸시되면 `.github/workflows/release.yml`이 자동 실행된다.
 
-- `go test ./...`를 실행한다.
-- `v0.4.1` 태그를 생성한다.
-- 원격 저장소로 태그를 푸시한다.
+워크플로우 실행 순서:
 
-태그가 푸시되면 [`.github/workflows/release.yml`](/Users/hjs/Personal/multi-pocketbase-ui/.github/workflows/release.yml)이 실행되어 GitHub Release를 생성하거나 갱신한다.
+1. `go test ./...` — 실패 시 릴리스 전체 중단
+2. GoReleaser 빌드 — `darwin-arm64`, `darwin-amd64` 바이너리 빌드
+3. GitHub Release 생성 및 아티팩트 업로드
+4. `jiseop121/homebrew-pbdash` 레포에 Formula 커밋
 
-워크플로우 역할:
+```
+# 3. GitHub Actions 완료 확인
+# https://github.com/jiseop121/pbdash/actions
 
-- `v0.4.1` 형식의 태그만 처리한다.
-- 대상 태그를 checkout 한다.
-- GitHub auto-generated release notes로 릴리스 본문을 만든다.
+# 4. GitHub Release에 아티팩트 2개 확인
+# https://github.com/jiseop121/pbdash/releases/tag/vx.y.z
 
-필요하면 GitHub Actions에서 `workflow_dispatch`로 기존 태그를 다시 지정해 Release만 재생성할 수 있다.
+# 5. homebrew-pbdash 레포에 formula 커밋 확인
+# https://github.com/jiseop121/homebrew-pbdash
+```
 
-## Homebrew 배포
+필요하면 GitHub Actions에서 `workflow_dispatch`로 기존 태그를 다시 지정해 재배포할 수 있다.
 
-GitHub 태그와 Release가 이미 존재하는 상태에서 실행한다.
+## 로컬 GoReleaser 테스트
 
 ```bash
-make release-brew VERSION=0.4.1
+brew install goreleaser
+make release-dry-run
+# dist/ 디렉토리에 생성 결과 확인
 ```
 
-이 명령은 다음을 한 번에 처리한다.
+## Homebrew 설치
 
-- `darwin-arm64`, `darwin-amd64` 바이너리 tar.gz를 빌드한다.
-- 현재 레포 Release(`v0.4.1`)에 아티팩트를 업로드한다.
-- `Formula/pbdash.rb`의 URL과 SHA256을 갱신한다.
-- Formula 변경을 커밋하고 푸시한다.
-- Homebrew 설치 스모크 테스트를 수행한다.
-
-아티팩트 이름은 항상 아래 형식을 유지한다.
-
-- `pbdash-v<x.y.z>-darwin-arm64.tar.gz`
-- `pbdash-v<x.y.z>-darwin-amd64.tar.gz`
+```bash
+brew tap jiseop121/pbdash
+brew install pbdash
+pbdash -c "version"
+```
 
 ## 릴리즈 노트 가이드
 
 기본값은 GitHub auto-generated release notes를 사용한다.
 
-- 태그가 푸시되면 [`.github/workflows/release.yml`](/Users/hjs/Personal/multi-pocketbase-ui/.github/workflows/release.yml)이 Release를 생성하거나 갱신한다.
+- GoReleaser가 Release를 생성하거나 갱신한다.
 - 별도 수동 릴리즈 노트 작성이나 덮어쓰기는 사용자가 명시적으로 요청한 경우에만 한다.
-- 수동 릴리즈 노트가 필요하면 태그 생성과 brew 배포 확인 이후에 진행한다.
 - 릴리즈 대상 PR은 머지 시점에 태그 릴리즈 노트 초안을 함께 준비한다.
 - 초안 형식은 `docs/development/release-note-template.md`를 기본으로 사용한다.
-- 최종 릴리즈 노트의 source of truth는 GitHub Releases 본문이다.
-- 버전별 릴리즈 노트 파일을 저장소에 추가하지 않는다. 별도 파일이 필요하면 임시 산출물로만 사용한다.
 
 수동 작성 시 확인할 기준:
 
 - merged PR과 커밋 목록을 먼저 확인한다.
 - 사용자에게 보이는 변경을 우선 정리한다.
-- 설치, 배포, Formula, 아티팩트 변경이 있으면 별도로 적는다.
 - breaking change가 있으면 가장 먼저 명시한다.
 
 현재 공개 릴리스 기준 권장 구성:
@@ -123,39 +128,8 @@ make release-brew VERSION=0.4.1
 - `Changed`: 동작 변경, 리팩터링, 버그 수정, 설치/배포 변경
 - `Breaking`: 호환성 깨짐, 명령/환경변수/경로 변경이 있을 때만 추가한다.
 
-최근 실제 릴리스 예시:
-
-- `v0.4.2`: `Added`, `Changed`
-- `v0.4.1`: `Added`, `Changed`
-- `v0.4.0`: `Changed`, `Breaking`
-
-작성 원칙:
-
-- 실제로 릴리스에 포함된 변경만 적는다.
-- 내부 구현 세부사항보다 사용자 영향과 업그레이드 포인트를 우선한다.
-- auto-generated notes로 충분하면 추가 설명 없이 그대로 둔다.
-- 수동 보완이 필요하면 기존 auto notes를 완전히 대체하기보다 필요한 설명만 최소 범위로 추가한다.
-
-릴리즈 대상 PR 운영 원칙:
-
-- 버전 PR에는 반드시 GitHub Release 본문에 옮길 초안이 준비돼 있어야 한다.
-- 리뷰어는 버전 파일과 릴리즈 노트 초안 준비 여부를 한 세트로 확인한다.
-- 릴리즈 노트 초안이 없으면 “릴리즈 준비 미완료”로 보고 머지를 보류한다.
-
-## 실행 순서
-
-1. PR 머지 전에 버전 관련 파일이 다음 버전으로 이미 올라가 있는지 확인한다.
-2. PR 머지 전에 릴리즈 노트 초안을 `docs/development/release-note-template.md`로 준비한다.
-3. `git status --short`로 워킹 트리가 clean 상태인지 확인한다.
-4. `go test ./...`를 실행한다.
-5. `make release-tag VERSION=x.y.z`를 실행한다.
-6. GitHub Release가 생성되었는지 확인한다.
-7. `make release-brew VERSION=x.y.z`를 실행한다.
-8. Release asset 2개와 `Formula/pbdash.rb` 갱신 여부를 확인한다.
-9. brew 설치 후 `pbdash -c "version"` 출력이 기대 버전인지 확인한다.
-
 ## 확인 포인트
 
-- Release에 darwin 아티팩트 2개가 모두 올라갔는지 본다.
-- `Formula/pbdash.rb`가 새 아티팩트 URL과 SHA256으로 갱신됐는지 본다.
+- GitHub Release에 darwin 아티팩트 2개가 모두 올라갔는지 본다.
+- `jiseop121/homebrew-pbdash` 레포에 Formula가 갱신됐는지 본다.
 - brew 설치 후 `pbdash -c "version"` 결과가 기대 버전인지 본다.

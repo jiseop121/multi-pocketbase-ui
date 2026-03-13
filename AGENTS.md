@@ -55,8 +55,8 @@
 - 작업이 끝나면 Pull Request를 올려 리뷰 가능한 형태로 제출합니다.
 - Pull Request를 올린 뒤에는 Copilot에게도 리뷰를 요청합니다.
 - 기능 변경, 버그 수정, 리팩터링, 릴리스 관련 수정은 가능한 한 서로 분리된 PR로 다룹니다.
-- 릴리스 대상 PR은 머지 전에 다음 버전 번호를 먼저 확정하고, 버전 관련 파일을 그 다음 버전으로 맞춘 상태에서 머지합니다.
-- 버전 관련 파일에는 최소한 앱 버전 상수와 `Formula/pbdash.rb`의 버전 문자열이 포함됩니다. 같은 릴리스에 다른 버전 표기 파일이 추가되면 그 파일도 같은 PR에서 함께 맞춥니다.
+- 릴리스 대상 PR은 머지 전에 다음 버전 번호를 먼저 확정합니다.
+- `internal/app/run.go`의 `var Version = "dev"`는 수동으로 바꾸지 않습니다. GoReleaser가 빌드 시 `-X` 플래그로 실제 버전을 주입합니다.
 
 ## 자주 사용하는 명령
 - `go test ./...`
@@ -105,7 +105,7 @@
 - 불가피하게 breaking change가 필요한 경우에는 바로 진행하지 말고 먼저 별도 논의 또는 이슈로 합의합니다.
 
 ## 릴리즈 노트 지침
-- GitHub Release 노트는 태그 푸시 후 GitHub Actions가 자동 생성합니다.
+- GitHub Release 노트는 태그 푸시 후 GoReleaser가 자동 생성합니다.
 - 관련 워크플로우는 `.github/workflows/release.yml` 입니다.
 - 수동으로 릴리즈 노트를 따로 작성하거나 덮어쓰는 작업은 사용자가 명시적으로 요청한 경우에만 합니다.
 - 새 버전 릴리스 시 먼저 태그를 만들고 푸시해야 합니다.
@@ -115,34 +115,24 @@
 - 릴리스 대상 PR은 머지와 함께 태그 릴리즈 노트 초안을 준비합니다. 기본 템플릿은 `docs/development/release-note-template.md`를 사용합니다.
 
 ## Homebrew 릴리스 지침
-- Homebrew 릴리스는 GitHub 태그/릴리스가 먼저 존재해야만 진행합니다.
-- 표준 절차는 `make release-brew VERSION=x.y.z` 입니다.
-- brew 릴리스는 다음을 한 번에 처리합니다.
-  - macOS `darwin-arm64`, `darwin-amd64` 바이너리 tar.gz 빌드
-  - GitHub Release asset 업로드
-  - `Formula/pbdash.rb`의 URL과 SHA256 갱신
-  - Formula 변경 커밋 및 푸시
-  - brew 설치 스모크 테스트
+- Homebrew Formula는 `jiseop121/homebrew-pbdash` 별도 탭 레포에서 관리합니다.
+- Formula 갱신은 태그 푸시 후 GoReleaser CI가 자동으로 처리합니다. 수동 개입 없음.
 - 아티팩트 이름은 항상 아래 형식을 유지합니다.
   - `pbdash-v<x.y.z>-darwin-arm64.tar.gz`
   - `pbdash-v<x.y.z>-darwin-amd64.tar.gz`
 - Formula 이름과 바이너리 이름은 모두 `pbdash`를 유지합니다.
 - 빌드 대상 엔트리포인트는 항상 `./cmd/pbdash` 입니다.
-- brew 스모크 테스트에서 설치된 `pbdash -c "version"` 결과가 릴리스 버전과 다르면 실패로 간주합니다.
 
 ## 릴리스 순서
 1. 워킹 트리가 clean 상태인지 확인합니다.
-2. `go test ./...` 통과를 확인합니다.
-3. `make release-tag VERSION=x.y.z`를 실행합니다.
-4. GitHub Release가 생성되었는지 확인합니다.
-5. `make release-brew VERSION=x.y.z`를 실행합니다.
-6. Release asset 2개와 `Formula/pbdash.rb` 갱신 여부를 확인합니다.
-7. brew 설치 후 `pbdash -c "version"`이 기대 버전인지 확인합니다.
+2. `make release-tag VERSION=x.y.z`를 실행합니다.
+3. GitHub Actions 완료 확인 (tests → build → formula 커밋 순으로 진행됩니다).
+4. GitHub Release에 darwin 아티팩트 2개 확인.
+5. `jiseop121/homebrew-pbdash` 레포에 Formula 커밋 확인.
 
 ## 금지사항
-- 태그가 없는데 brew 릴리스를 먼저 실행하지 않습니다.
 - 기존 태그를 재사용하거나 덮어쓰지 않습니다.
-- Formula URL, SHA, 바이너리 이름을 수동으로 임의 변경하지 않습니다.
+- `make release-brew`를 실행하지 않습니다 (deprecated, GoReleaser CI로 대체됨).
 - 릴리스와 무관한 수정사항을 릴리스 커밋에 섞지 않습니다.
 
 ## 판단이 애매할 때

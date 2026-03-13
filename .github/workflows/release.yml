@@ -3,11 +3,11 @@ name: release
 on:
   push:
     tags:
-      - "v*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to publish (e.g. v0.2.1)"
+        description: "재배포할 기존 태그 (예: v0.6.0)"
         required: true
         type: string
 
@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  github-release:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve target tag
@@ -27,19 +27,22 @@ jobs:
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
-      - name: Validate tag format
-        run: |
-          echo "${{ steps.vars.outputs.tag }}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
-
-      - name: Checkout target tag
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ steps.vars.outputs.tag }}
 
-      - name: Create or update release with auto notes
-        uses: softprops/action-gh-release@v2
+      - uses: actions/setup-go@v5
         with:
-          tag_name: ${{ steps.vars.outputs.tag }}
-          generate_release_notes: true
-          make_latest: true
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test ./...
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
