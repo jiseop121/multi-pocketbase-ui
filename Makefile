@@ -35,7 +35,7 @@ endif
 POCKETBASE_ASSET := pocketbase_$(POCKETBASE_VERSION)_$(POCKETBASE_OS)_$(POCKETBASE_ARCH).zip
 POCKETBASE_DOWNLOAD_URL := https://github.com/pocketbase/pocketbase/releases/download/v$(POCKETBASE_VERSION)/$(POCKETBASE_ASSET)
 
-.PHONY: test e2e pocketbase-bin pocketbase-superuser pocketbase-serve pb-su pb-serve release-tag release-brew
+.PHONY: test e2e pocketbase-bin pocketbase-superuser pocketbase-serve pb-su pb-serve release-tag release-brew release-dry-run
 
 test:
 	$(GO) test ./...
@@ -120,5 +120,12 @@ release-tag:
 	./scripts/release_tag.sh "$(VERSION)"
 
 release-brew:
-	@if [ -z "$(VERSION)" ]; then echo "VERSION is required. Example: make release-brew VERSION=0.2.1"; exit 1; fi
-	./scripts/release_brew_single_repo.sh --version "$(VERSION)" --github-repo "jiseop121/pbdash"
+	@echo "release-brew는 deprecated되었습니다."
+	@echo "태그 푸시만 하면 CI(GoReleaser)가 자동 처리합니다: make release-tag VERSION=x.y.z"
+	@echo "로컬 테스트: make release-dry-run"
+	@exit 1
+
+release-dry-run:
+	@if ! command -v goreleaser >/dev/null 2>&1; then \
+		echo "goreleaser가 없습니다. 설치: brew install goreleaser"; exit 1; fi
+	goreleaser release --snapshot --clean
