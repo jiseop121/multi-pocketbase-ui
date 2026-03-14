@@ -31,7 +31,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if _, err := validateOutputOptions(*format, *out); err != nil {
 			return err
 		}
-		target, err := d.resolveTarget(*dbAlias, *suAlias)
+		target, err := d.resolveSession(*dbAlias, *suAlias)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if _, err := validateOutputOptions(*format, *out); err != nil {
 			return err
 		}
-		target, err := d.resolveTarget(*dbAlias, *suAlias)
+		target, err := d.resolveSession(*dbAlias, *suAlias)
 		if err != nil {
 			return err
 		}
@@ -121,7 +121,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 			state.PerPage = v
 		}
 
-		target, err := d.resolveTarget(*dbAlias, *suAlias)
+		target, err := d.resolveSession(*dbAlias, *suAlias)
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		target, err := d.resolveTarget(*dbAlias, *suAlias)
+		target, err := d.resolveSession(*dbAlias, *suAlias)
 		if err != nil {
 			return err
 		}
@@ -200,32 +200,32 @@ func shouldUseRecordsTUI(view, format string, hasTTY bool) (bool, error) {
 	}
 }
 
-type pbTarget struct {
+type pbSession struct {
 	DB storage.DB
 	SU storage.Superuser
 }
 
-func (d *Dispatcher) resolveTarget(dbAlias, suAlias string) (pbTarget, error) {
+func (d *Dispatcher) resolveSession(dbAlias, suAlias string) (pbSession, error) {
 	resolvedDB, resolvedSU, err := d.resolveAliases(dbAlias, suAlias)
 	if err != nil {
-		return pbTarget{}, err
+		return pbSession{}, err
 	}
 
 	db, found, err := d.dbStore.Find(resolvedDB)
 	if err != nil {
-		return pbTarget{}, mapStoreError(err)
+		return pbSession{}, mapStoreError(err)
 	}
 	if !found {
-		return pbTarget{}, apperr.Invalid("Could not find a saved db named \""+resolvedDB+"\".", "Run `pbdash db list` to see available db aliases.")
+		return pbSession{}, apperr.Invalid("Could not find a saved db named \""+resolvedDB+"\".", "Run `pbdash db list` to see available db aliases.")
 	}
 	su, found, err := d.suStore.Find(db.Alias, resolvedSU)
 	if err != nil {
-		return pbTarget{}, mapStoreError(err)
+		return pbSession{}, mapStoreError(err)
 	}
 	if !found {
-		return pbTarget{}, apperr.Invalid("Superuser alias \""+resolvedSU+"\" is not configured for db \""+db.Alias+"\".", "Run `pbdash superuser list --db "+db.Alias+"` to see available aliases.")
+		return pbSession{}, apperr.Invalid("Superuser alias \""+resolvedSU+"\" is not configured for db \""+db.Alias+"\".", "Run `pbdash superuser list --db "+db.Alias+"` to see available aliases.")
 	}
-	return pbTarget{DB: db, SU: su}, nil
+	return pbSession{DB: db, SU: su}, nil
 }
 
 func (d *Dispatcher) resolveAliases(dbAlias, suAlias string) (string, string, error) {
@@ -265,7 +265,7 @@ func contextMatchesDB(ctx commandContext, resolvedDB string) bool {
 	return strings.EqualFold(ctx.DBAlias, resolvedDB)
 }
 
-func (d *Dispatcher) fetchRecords(ctx context.Context, target pbTarget, state RecordsQueryState) (pocketbase.QueryResult, error) {
+func (d *Dispatcher) fetchRecords(ctx context.Context, target pbSession, state RecordsQueryState) (pocketbase.QueryResult, error) {
 	payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildRecordsEndpoint(state.Collection), state.QueryParams())
 	if err != nil {
 		return pocketbase.QueryResult{}, err
@@ -273,7 +273,7 @@ func (d *Dispatcher) fetchRecords(ctx context.Context, target pbTarget, state Re
 	return pocketbase.ParseItemsResult(payload), nil
 }
 
-func (d *Dispatcher) getJSONWithAuth(ctx context.Context, target pbTarget, endpoint string, query map[string]string) (map[string]any, error) {
+func (d *Dispatcher) getJSONWithAuth(ctx context.Context, target pbSession, endpoint string, query map[string]string) (map[string]any, error) {
 	token, err := d.authenticate(ctx, target, false)
 	if err != nil {
 		return nil, err
@@ -300,7 +300,7 @@ func (d *Dispatcher) getJSONWithAuth(ctx context.Context, target pbTarget, endpo
 	return payload, nil
 }
 
-func (d *Dispatcher) authenticate(ctx context.Context, target pbTarget, force bool) (string, error) {
+func (d *Dispatcher) authenticate(ctx context.Context, target pbSession, force bool) (string, error) {
 	if !force {
 		if token, ok := d.getCachedToken(target); ok {
 			return token, nil
@@ -314,7 +314,7 @@ func (d *Dispatcher) authenticate(ctx context.Context, target pbTarget, force bo
 	return token, nil
 }
 
-func (d *Dispatcher) getCachedToken(target pbTarget) (string, bool) {
+func (d *Dispatcher) getCachedToken(target pbSession) (string, bool) {
 	entry, ok := d.authCache[authCacheKey{dbAlias: strings.ToLower(target.DB.Alias), suAlias: strings.ToLower(target.SU.Alias)}]
 	if !ok {
 		return "", false
@@ -329,7 +329,7 @@ func (d *Dispatcher) getCachedToken(target pbTarget) (string, bool) {
 	return entry.token, true
 }
 
-func (d *Dispatcher) storeCachedToken(target pbTarget, token string) {
+func (d *Dispatcher) storeCachedToken(target pbSession, token string) {
 	entry := authCacheEntry{token: token}
 	if expiresAt, ok := parseTokenExpiry(token); ok {
 		entry.expiresAt = expiresAt
@@ -339,7 +339,7 @@ func (d *Dispatcher) storeCachedToken(target pbTarget, token string) {
 	d.authCache[key] = entry
 }
 
-func (d *Dispatcher) clearAuthCache(target pbTarget) {
+func (d *Dispatcher) clearAuthCache(target pbSession) {
 	delete(d.authCache, authCacheKey{dbAlias: strings.ToLower(target.DB.Alias), suAlias: strings.ToLower(target.SU.Alias)})
 }
 

@@ -27,7 +27,7 @@ type recordsSimulationHarness struct {
 type recordsSimulationConfig struct {
 	result        pocketbase.QueryResult
 	state         RecordsQueryState
-	target        pbTarget
+	session        pbSession
 	totalItems    int
 	totalPages    int
 	detailVisible bool
@@ -40,7 +40,7 @@ func TestNavigatorTUISimulationRendersRecordsScreen(t *testing.T) {
 			{"id": "rec-002", "title": "second-row", "status": "closed"},
 		}},
 		state: RecordsQueryState{Collection: "posts", Page: 1, PerPage: 20},
-		target: pbTarget{
+		session: pbSession{
 			DB: storage.DB{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
 			SU: storage.Superuser{DBAlias: "dev", Alias: "root", Email: "root@example.com"},
 		},
@@ -65,7 +65,7 @@ func TestNavigatorTUISimulationOpensSelectedRecordDetail(t *testing.T) {
 			PerPage:    20,
 			Fields:     []string{"id", "title"},
 		},
-		target:        pbTarget{DB: storage.DB{Alias: "dev"}, SU: storage.Superuser{Alias: "root"}},
+		session:        pbSession{DB: storage.DB{Alias: "dev"}, SU: storage.Superuser{Alias: "root"}},
 		totalItems:    2,
 		totalPages:    1,
 		detailVisible: false,
@@ -93,7 +93,7 @@ func TestNavigatorTUISimulationCopiesRecordDetail(t *testing.T) {
 			PerPage:    20,
 			Fields:     []string{"id", "title"},
 		},
-		target:        pbTarget{DB: storage.DB{Alias: "dev"}, SU: storage.Superuser{Alias: "root"}},
+		session:        pbSession{DB: storage.DB{Alias: "dev"}, SU: storage.Superuser{Alias: "root"}},
 		totalItems:    1,
 		totalPages:    1,
 		detailVisible: false,
@@ -111,7 +111,7 @@ func TestNavigatorTUISimulationHorizontalScrollsColumns(t *testing.T) {
 	h := newRecordsSimulationHarness(t, recordsSimulationConfig{
 		result:        queryResultWithColumns(visibleColumnWindow + 1),
 		state:         RecordsQueryState{Collection: "posts", Page: 1, PerPage: 20},
-		target:        pbTarget{DB: storage.DB{Alias: "dev"}, SU: storage.Superuser{Alias: "root"}},
+		session:        pbSession{DB: storage.DB{Alias: "dev"}, SU: storage.Superuser{Alias: "root"}},
 		totalItems:    1,
 		totalPages:    1,
 		detailVisible: false,
@@ -262,8 +262,8 @@ func newSimulationNavigatorTUI(cfg recordsSimulationConfig, screen tcell.Simulat
 		detailView:    tview.NewTextView(),
 		helpView:      tview.NewTextView(),
 		screen:        screenRecords,
-		hasTarget:     true,
-		target:        cfg.target,
+		hasSession:     true,
+		session:        cfg.session,
 		recordsState:  cfg.state,
 		result:        cfg.result,
 		totalItems:    cfg.totalItems,

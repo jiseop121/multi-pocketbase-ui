@@ -32,8 +32,8 @@ const (
 
 type navigatorRoute struct {
 	screen    navigatorScreen
-	target    pbTarget
-	hasTarget bool
+	session    pbSession
+	hasSession bool
 	state     RecordsQueryState
 }
 
@@ -55,8 +55,8 @@ type navigatorTUI struct {
 	screen      navigatorScreen
 	history     []navigatorScreen
 	modalOpen   bool
-	hasTarget   bool
-	target      pbTarget
+	hasSession   bool
+	session      pbSession
 	dbs         []storage.DB
 	superusers  []storage.Superuser
 	collections []map[string]any
@@ -110,7 +110,7 @@ func (m dbManagerState) save(dispatcher *Dispatcher, alias, baseURL string) erro
 
 func (m dbManagerState) remove(dispatcher *Dispatcher) error {
 	if m.selectedAlias == "" {
-		return apperr.Invalid("Select an existing db alias first.", "Choose a saved db alias from the target field.")
+		return apperr.Invalid("Select an existing db alias first.", "Choose a saved db alias from the list.")
 	}
 
 	return dispatcher.removeDBAlias(m.selectedAlias)
@@ -133,21 +133,21 @@ func (m superuserManagerState) save(dispatcher *Dispatcher, alias, email, passwo
 
 func (m superuserManagerState) remove(dispatcher *Dispatcher) error {
 	if m.selectedAlias == "" {
-		return apperr.Invalid("Select an existing superuser first.", "Choose a saved superuser from the target field.")
+		return apperr.Invalid("Select an existing superuser first.", "Choose a saved superuser from the list.")
 	}
 
 	return dispatcher.removeSuperuser(m.selectedDB, m.selectedAlias)
 }
 
-func (d *Dispatcher) RunRecordsTUI(ctx context.Context, target pbTarget, state RecordsQueryState) error {
-	return d.runRecordsTUI(ctx, target, state)
+func (d *Dispatcher) RunRecordsTUI(ctx context.Context, session pbSession, state RecordsQueryState) error {
+	return d.runRecordsTUI(ctx, session, state)
 }
 
-func (d *Dispatcher) runRecordsTUI(ctx context.Context, target pbTarget, state RecordsQueryState) error {
+func (d *Dispatcher) runRecordsTUI(ctx context.Context, session pbSession, state RecordsQueryState) error {
 	return d.navigatorRunner(ctx, navigatorRoute{
 		screen:    screenRecords,
-		target:    target,
-		hasTarget: true,
+		session:   session,
+		hasSession: true,
 		state:     state,
 	})
 }
@@ -194,9 +194,9 @@ func (d *Dispatcher) runNavigatorTUI(ctx context.Context, route navigatorRoute) 
 }
 
 func (ui *navigatorTUI) bootstrap(route navigatorRoute) error {
-	if route.hasTarget && route.screen == screenRecords {
-		ui.hasTarget = true
-		ui.target = route.target
+	if route.hasSession && route.screen == screenRecords {
+		ui.hasSession = true
+		ui.session = route.session
 		ui.recordsState = route.state
 		if ui.recordsState.Page == 0 {
 			ui.recordsState.Page = 1
@@ -537,13 +537,13 @@ func (ui *navigatorTUI) activateSelectedDB() error {
 	}
 	previousSession := ui.dispatcher.sessionCtx
 
-	ui.hasTarget = true
-	ui.target = pbTarget{DB: db}
+	ui.hasSession = true
+	ui.session = pbSession{DB: db}
 	ui.dispatcher.sessionCtx.DBAlias = db.Alias
 	ui.dispatcher.sessionCtx.SuperuserAlias = ""
 
 	if preferred, ok := pickPreferredSuperuser(db.Alias, superusers, previousSession, ui.dispatcher.savedCtx); ok {
-		ui.target.SU = preferred
+		ui.session.SU = preferred
 		ui.dispatcher.sessionCtx.SuperuserAlias = preferred.Alias
 		if err := ui.loadCollections(); err != nil {
 			return err
@@ -566,8 +566,8 @@ func (ui *navigatorTUI) activateSelectedSuperuser() error {
 		return nil
 	}
 	su := ui.superusers[ui.selectedIndex]
-	ui.target.SU = su
-	ui.dispatcher.sessionCtx = commandContext{DBAlias: ui.target.DB.Alias, SuperuserAlias: su.Alias}
+	ui.session.SU = su
+	ui.dispatcher.sessionCtx = commandContext{DBAlias: ui.session.DB.Alias, SuperuserAlias: su.Alias}
 	if err := ui.loadCollections(); err != nil {
 		return err
 	}
@@ -623,10 +623,10 @@ func (ui *navigatorTUI) loadDBs() error {
 }
 
 func (ui *navigatorTUI) loadSuperusers() error {
-	if !ui.hasTarget {
+	if !ui.hasSession {
 		return apperr.RuntimeErr("No db is selected.", "", nil)
 	}
-	items, err := ui.dispatcher.suStore.ListByDB(ui.target.DB.Alias)
+	items, err := ui.dispatcher.suStore.ListByDB(ui.session.DB.Alias)
 	if err != nil {
 		return mapStoreError(err)
 	}
@@ -635,10 +635,10 @@ func (ui *navigatorTUI) loadSuperusers() error {
 }
 
 func (ui *navigatorTUI) loadCollections() error {
-	if !ui.hasTarget {
-		return apperr.RuntimeErr("No target is selected.", "", nil)
+	if !ui.hasSession {
+		return apperr.RuntimeErr("No database selected.", "", nil)
 	}
-	result, err := ui.dispatcher.fetchCollections(ui.ctx, ui.target)
+	result, err := ui.dispatcher.fetchCollections(ui.ctx, ui.session)
 	if err != nil {
 		return err
 	}
@@ -646,8 +646,8 @@ func (ui *navigatorTUI) loadCollections() error {
 	return nil
 }
 
-func (d *Dispatcher) fetchCollections(ctx context.Context, target pbTarget) (pocketbase.QueryResult, error) {
-	payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildCollectionsEndpoint(), nil)
+func (d *Dispatcher) fetchCollections(ctx context.Context, session pbSession) (pocketbase.QueryResult, error) {
+	payload, err := d.getJSONWithAuth(ctx, session, pocketbase.BuildCollectionsEndpoint(), nil)
 	if err != nil {
 		return pocketbase.QueryResult{}, err
 	}
@@ -655,7 +655,7 @@ func (d *Dispatcher) fetchCollections(ctx context.Context, target pbTarget) (poc
 }
 
 func (ui *navigatorTUI) fetchRecords() error {
-	result, err := ui.dispatcher.fetchRecords(ui.ctx, ui.target, ui.recordsState)
+	result, err := ui.dispatcher.fetchRecords(ui.ctx, ui.session, ui.recordsState)
 	if err != nil {
 		return err
 	}
@@ -971,10 +971,10 @@ func (ui *navigatorTUI) shiftColumns(delta int) {
 func (ui *navigatorTUI) statusText() string {
 	const sep = "  │  "
 	parts := []string{"path=" + ui.breadcrumb()}
-	if ui.hasTarget {
-		parts = append(parts, "db="+ui.target.DB.Alias)
-		if strings.TrimSpace(ui.target.SU.Alias) != "" {
-			parts = append(parts, "superuser="+ui.target.SU.Alias)
+	if ui.hasSession {
+		parts = append(parts, "db="+ui.session.DB.Alias)
+		if strings.TrimSpace(ui.session.SU.Alias) != "" {
+			parts = append(parts, "superuser="+ui.session.SU.Alias)
 		}
 	}
 	if ui.screen == screenRecords || ui.screen == screenRecordDetail {
@@ -999,12 +999,12 @@ func (ui *navigatorTUI) statusText() string {
 
 func (ui *navigatorTUI) breadcrumb() string {
 	trail := []string{"dbs"}
-	if ui.hasTarget {
-		trail = append(trail, ui.target.DB.Alias)
+	if ui.hasSession {
+		trail = append(trail, ui.session.DB.Alias)
 	}
 	if ui.screen == screenSuperusers || ui.screen == screenCollections || ui.screen == screenRecords || ui.screen == screenRecordDetail {
-		if strings.TrimSpace(ui.target.SU.Alias) != "" {
-			trail = append(trail, ui.target.SU.Alias)
+		if strings.TrimSpace(ui.session.SU.Alias) != "" {
+			trail = append(trail, ui.session.SU.Alias)
 		} else if ui.screen == screenSuperusers {
 			trail = append(trail, "superusers")
 		}
@@ -1167,7 +1167,7 @@ func (ui *navigatorTUI) openDBManagerModal() {
 
 	manager := newDBManagerState(items)
 	form := tview.NewForm()
-	form.AddDropDown("target", manager.choices(), 0, nil)
+	form.AddDropDown("select", manager.choices(), 0, nil)
 	form.AddInputField("alias", "", 0, nil, nil)
 	form.AddInputField("base url", "", 0, nil, nil)
 
@@ -1212,7 +1212,7 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 		return
 	}
 
-	manager := newSuperuserManagerState(dbs, ui.target.DB.Alias)
+	manager := newSuperuserManagerState(dbs, ui.session.DB.Alias)
 	if err := manager.loadSuperusers(ui.dispatcher); err != nil {
 		ui.showError(err)
 		return
@@ -1220,13 +1220,13 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 
 	form := tview.NewForm()
 	form.AddDropDown("db", dbAliasOptions(dbs), manager.selectedDBIndex(), nil)
-	form.AddDropDown("target", manager.aliasChoices(), 0, nil)
+	form.AddDropDown("superuser", manager.aliasChoices(), 0, nil)
 	form.AddInputField("alias", "", 0, nil, nil)
 	form.AddInputField("email", "", 0, nil, nil)
 	form.AddPasswordField("password(blank=keep)", "", 0, '*', nil)
 
 	dbDropdown := form.GetFormItem(0).(*tview.DropDown)
-	targetDropdown := form.GetFormItem(1).(*tview.DropDown)
+	superuserDropdown := form.GetFormItem(1).(*tview.DropDown)
 	aliasField := form.GetFormItem(2).(*tview.InputField)
 	emailField := form.GetFormItem(3).(*tview.InputField)
 	passwordField := form.GetFormItem(4).(*tview.InputField)
@@ -1237,13 +1237,13 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 			ui.showError(err)
 			return
 		}
-		targetDropdown.SetOptions(manager.aliasChoices(), func(option string, _ int) {
+		superuserDropdown.SetOptions(manager.aliasChoices(), func(option string, _ int) {
 			applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, option)
 		})
-		targetDropdown.SetCurrentOption(0)
+		superuserDropdown.SetCurrentOption(0)
 		applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, managerNewOption)
 	})
-	targetDropdown.SetSelectedFunc(func(text string, _ int) {
+	superuserDropdown.SetSelectedFunc(func(text string, _ int) {
 		applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, text)
 	})
 	applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, managerNewOption)
@@ -1274,14 +1274,14 @@ func (ui *navigatorTUI) saveDBManager(manager dbManagerState, alias, baseURL str
 		return
 	}
 
-	ui.retargetDBAlias(previousAlias, alias)
+	ui.updateSessionDB(previousAlias, alias)
 	ui.reloadAfterLocalConfigChange("db aliases updated")
 }
 
 func (ui *navigatorTUI) deleteDBManager(manager dbManagerState) {
 	ui.closeModal("db-manager")
 	ui.openConfirmModal("Delete alias '"+manager.selectedAlias+"'?", func() {
-		status := dbDeleteStatus(ui.target.DB.Alias, manager.selectedAlias)
+		status := dbDeleteStatus(ui.session.DB.Alias, manager.selectedAlias)
 		if err := manager.remove(ui.dispatcher); err != nil {
 			ui.showError(err)
 			return
@@ -1298,14 +1298,14 @@ func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alia
 		return
 	}
 
-	ui.retargetSuperuserAlias(manager.selectedDB, previousAlias, alias)
+	ui.updateSessionSuperuser(manager.selectedDB, previousAlias, alias)
 	ui.reloadAfterLocalConfigChange("superusers updated")
 }
 
 func (ui *navigatorTUI) deleteSuperuserManager(manager superuserManagerState) {
 	ui.closeModal("superuser-manager")
 	ui.openConfirmModal("Delete superuser '"+manager.selectedAlias+"'?", func() {
-		status := superuserDeleteStatus(ui.target, manager.selectedDB, manager.selectedAlias)
+		status := superuserDeleteStatus(ui.session, manager.selectedDB, manager.selectedAlias)
 		if err := manager.remove(ui.dispatcher); err != nil {
 			ui.showError(err)
 			return
@@ -1421,11 +1421,11 @@ func (ui *navigatorTUI) syncLocalConfigState() error {
 	if err := ui.loadDBs(); err != nil {
 		return err
 	}
-	if !ui.hasTarget {
+	if !ui.hasSession {
 		return nil
 	}
 
-	db, found, err := ui.dispatcher.dbStore.Find(ui.target.DB.Alias)
+	db, found, err := ui.dispatcher.dbStore.Find(ui.session.DB.Alias)
 	if err != nil {
 		return mapStoreError(err)
 	}
@@ -1433,17 +1433,17 @@ func (ui *navigatorTUI) syncLocalConfigState() error {
 		ui.resetToDBList()
 		return nil
 	}
-	ui.target.DB = db
+	ui.session.DB = db
 
-	if strings.TrimSpace(ui.target.SU.Alias) != "" {
-		su, found, err := ui.dispatcher.suStore.Find(db.Alias, ui.target.SU.Alias)
+	if strings.TrimSpace(ui.session.SU.Alias) != "" {
+		su, found, err := ui.dispatcher.suStore.Find(db.Alias, ui.session.SU.Alias)
 		if err != nil {
 			return mapStoreError(err)
 		}
 		if found {
-			ui.target.SU = su
+			ui.session.SU = su
 		} else {
-			ui.target.SU = storage.Superuser{}
+			ui.session.SU = storage.Superuser{}
 			if ui.screen == screenCollections || ui.screen == screenRecords {
 				ui.screen = screenSuperusers
 				ui.history = []navigatorScreen{screenDBList}
@@ -1455,13 +1455,13 @@ func (ui *navigatorTUI) syncLocalConfigState() error {
 	case screenSuperusers:
 		return ui.loadSuperusers()
 	case screenCollections:
-		if strings.TrimSpace(ui.target.SU.Alias) == "" {
+		if strings.TrimSpace(ui.session.SU.Alias) == "" {
 			ui.screen = screenSuperusers
 			return ui.loadSuperusers()
 		}
 		return ui.loadCollections()
 	case screenRecords:
-		if strings.TrimSpace(ui.target.SU.Alias) == "" {
+		if strings.TrimSpace(ui.session.SU.Alias) == "" {
 			ui.screen = screenSuperusers
 			return ui.loadSuperusers()
 		}
@@ -1470,7 +1470,7 @@ func (ui *navigatorTUI) syncLocalConfigState() error {
 		}
 		return ui.fetchRecords()
 	case screenRecordDetail:
-		if strings.TrimSpace(ui.target.SU.Alias) == "" {
+		if strings.TrimSpace(ui.session.SU.Alias) == "" {
 			ui.screen = screenSuperusers
 			return ui.loadSuperusers()
 		}
@@ -1492,8 +1492,8 @@ func (ui *navigatorTUI) syncLocalConfigState() error {
 func (ui *navigatorTUI) resetToDBList() {
 	ui.screen = screenDBList
 	ui.history = nil
-	ui.hasTarget = false
-	ui.target = pbTarget{}
+	ui.hasSession = false
+	ui.session = pbSession{}
 	ui.superusers = nil
 	ui.collections = nil
 	ui.result = pocketbase.QueryResult{}
@@ -1504,32 +1504,32 @@ func (ui *navigatorTUI) resetToDBList() {
 	ui.columnOffset = 0
 }
 
-func (ui *navigatorTUI) retargetDBAlias(previousAlias, nextAlias string) {
-	if !ui.hasTarget || strings.TrimSpace(previousAlias) == "" {
+func (ui *navigatorTUI) updateSessionDB(previousAlias, nextAlias string) {
+	if !ui.hasSession || strings.TrimSpace(previousAlias) == "" {
 		return
 	}
-	if !strings.EqualFold(ui.target.DB.Alias, previousAlias) {
+	if !strings.EqualFold(ui.session.DB.Alias, previousAlias) {
 		return
 	}
 
-	ui.target.DB.Alias = nextAlias
-	if strings.EqualFold(ui.target.SU.DBAlias, previousAlias) {
-		ui.target.SU.DBAlias = nextAlias
+	ui.session.DB.Alias = nextAlias
+	if strings.EqualFold(ui.session.SU.DBAlias, previousAlias) {
+		ui.session.SU.DBAlias = nextAlias
 	}
 }
 
-func (ui *navigatorTUI) retargetSuperuserAlias(dbAlias, previousAlias, nextAlias string) {
-	if !ui.hasTarget || strings.TrimSpace(previousAlias) == "" {
+func (ui *navigatorTUI) updateSessionSuperuser(dbAlias, previousAlias, nextAlias string) {
+	if !ui.hasSession || strings.TrimSpace(previousAlias) == "" {
 		return
 	}
-	if !strings.EqualFold(ui.target.DB.Alias, dbAlias) {
+	if !strings.EqualFold(ui.session.DB.Alias, dbAlias) {
 		return
 	}
-	if !strings.EqualFold(ui.target.SU.Alias, previousAlias) {
+	if !strings.EqualFold(ui.session.SU.Alias, previousAlias) {
 		return
 	}
 
-	ui.target.SU.Alias = nextAlias
+	ui.session.SU.Alias = nextAlias
 }
 
 func applyDBFormSelection(manager *dbManagerState, aliasField, baseURLField *tview.InputField, value string) {
@@ -1826,8 +1826,8 @@ func dbDeleteStatus(currentTargetAlias, deletedAlias string) string {
 	return "db aliases updated"
 }
 
-func superuserDeleteStatus(target pbTarget, deletedDBAlias, deletedAlias string) string {
-	if strings.EqualFold(target.DB.Alias, deletedDBAlias) && strings.EqualFold(target.SU.Alias, deletedAlias) {
+func superuserDeleteStatus(session pbSession, deletedDBAlias, deletedAlias string) string {
+	if strings.EqualFold(session.DB.Alias, deletedDBAlias) && strings.EqualFold(session.SU.Alias, deletedAlias) {
 		return "current superuser alias was removed from local config"
 	}
 	return "superusers updated"

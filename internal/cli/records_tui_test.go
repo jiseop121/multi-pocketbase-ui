@@ -77,7 +77,7 @@ func TestPickPreferredSuperuser(t *testing.T) {
 
 func TestRunRecordsTUIUsesNavigatorRunner(t *testing.T) {
 	d := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
-	target := pbTarget{
+	session := pbSession{
 		DB: storage.DB{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
 		SU: storage.Superuser{DBAlias: "dev", Alias: "root", Email: "root@example.com"},
 	}
@@ -89,14 +89,14 @@ func TestRunRecordsTUIUsesNavigatorRunner(t *testing.T) {
 		return nil
 	}
 
-	if err := d.runRecordsTUI(context.Background(), target, state); err != nil {
+	if err := d.runRecordsTUI(context.Background(), session, state); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !gotRoute.hasTarget || gotRoute.screen != screenRecords {
+	if !gotRoute.hasSession || gotRoute.screen != screenRecords {
 		t.Fatalf("unexpected route: %+v", gotRoute)
 	}
-	if gotRoute.target.DB.Alias != "dev" || gotRoute.target.SU.Alias != "root" {
-		t.Fatalf("target mismatch: %+v", gotRoute.target)
+	if gotRoute.session.DB.Alias != "dev" || gotRoute.session.SU.Alias != "root" {
+		t.Fatalf("session mismatch: %+v", gotRoute.session)
 	}
 	if gotRoute.state.Collection != "posts" || gotRoute.state.Page != 2 {
 		t.Fatalf("state mismatch: %+v", gotRoute.state)
@@ -454,19 +454,19 @@ func TestNewSuperuserManagerStateFallsBackToFirstDB(t *testing.T) {
 
 func TestNavigatorTUIRetargetAliasesAfterRename(t *testing.T) {
 	ui := &navigatorTUI{
-		hasTarget: true,
-		target: pbTarget{
+		hasSession: true,
+		session: pbSession{
 			DB: storage.DB{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
 			SU: storage.Superuser{DBAlias: "dev", Alias: "root", Email: "root@example.com"},
 		},
 	}
 
-	ui.retargetDBAlias("dev", "prod")
-	assert.Equal(t, "prod", ui.target.DB.Alias)
-	assert.Equal(t, "prod", ui.target.SU.DBAlias)
+	ui.updateSessionDB("dev", "prod")
+	assert.Equal(t, "prod", ui.session.DB.Alias)
+	assert.Equal(t, "prod", ui.session.SU.DBAlias)
 
-	ui.retargetSuperuserAlias("prod", "root", "admin")
-	assert.Equal(t, "admin", ui.target.SU.Alias)
+	ui.updateSessionSuperuser("prod", "root", "admin")
+	assert.Equal(t, "admin", ui.session.SU.Alias)
 }
 
 func TestSuperuserManagerStateSaveAndRemove(t *testing.T) {
