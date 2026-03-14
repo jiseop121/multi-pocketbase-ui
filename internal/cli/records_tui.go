@@ -1250,14 +1250,15 @@ func (ui *navigatorTUI) saveDBManager(manager dbManagerState, alias, baseURL str
 }
 
 func (ui *navigatorTUI) deleteDBManager(manager dbManagerState) {
-	status := dbDeleteStatus(ui.target.DB.Alias, manager.selectedAlias)
 	ui.closeModal("db-manager")
-	if err := manager.remove(ui.dispatcher); err != nil {
-		ui.showError(err)
-		return
-	}
-
-	ui.reloadAfterLocalConfigChange(status)
+	ui.openConfirmModal("Delete alias '"+manager.selectedAlias+"'?", func() {
+		status := dbDeleteStatus(ui.target.DB.Alias, manager.selectedAlias)
+		if err := manager.remove(ui.dispatcher); err != nil {
+			ui.showError(err)
+			return
+		}
+		ui.reloadAfterLocalConfigChange(status)
+	})
 }
 
 func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alias, email, password string) {
@@ -1273,14 +1274,15 @@ func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alia
 }
 
 func (ui *navigatorTUI) deleteSuperuserManager(manager superuserManagerState) {
-	status := superuserDeleteStatus(ui.target, manager.selectedDB, manager.selectedAlias)
 	ui.closeModal("superuser-manager")
-	if err := manager.remove(ui.dispatcher); err != nil {
-		ui.showError(err)
-		return
-	}
-
-	ui.reloadAfterLocalConfigChange(status)
+	ui.openConfirmModal("Delete superuser '"+manager.selectedAlias+"'?", func() {
+		status := superuserDeleteStatus(ui.target, manager.selectedDB, manager.selectedAlias)
+		if err := manager.remove(ui.dispatcher); err != nil {
+			ui.showError(err)
+			return
+		}
+		ui.reloadAfterLocalConfigChange(status)
+	})
 }
 
 func (ui *navigatorTUI) reloadAfterLocalConfigChange(status string) {
@@ -1332,6 +1334,30 @@ func (ui *navigatorTUI) focusMain() {
 	if ui.tableView != nil {
 		ui.app.SetFocus(ui.tableView)
 	}
+}
+
+func (ui *navigatorTUI) openConfirmModal(message string, onConfirm func()) {
+	const pageName = "confirm"
+	form := tview.NewForm()
+	form.AddButton("Confirm", func() {
+		ui.closeModal(pageName)
+		onConfirm()
+	})
+	form.AddButton("Cancel", func() {
+		ui.closeModal(pageName)
+	})
+	form.SetBorder(true).SetTitle(" Confirm ")
+	form.SetButtonsAlign(tview.AlignCenter)
+
+	text := tview.NewTextView().SetText(message).SetTextAlign(tview.AlignCenter)
+	container := tview.NewFlex().SetDirection(tview.FlexRow)
+	container.AddItem(text, 0, 1, false)
+	container.AddItem(form, 3, 0, true)
+
+	installFormArrowNavigationWithClose(form, func() { ui.closeModal(pageName) })
+	ui.modalOpen = true
+	ui.pages.AddPage(pageName, center(60, 7, container), true, true)
+	ui.app.SetFocus(form)
 }
 
 func (ui *navigatorTUI) dismissErrorModal() {
