@@ -421,18 +421,22 @@ func (ui *navigatorTUI) isRecordDetailScreen() bool {
 func (ui *navigatorTUI) handleEnter() {
 	switch ui.screen {
 	case screenDBList:
+		ui.setLoadingStatus()
 		if err := ui.activateSelectedDB(); err != nil {
 			ui.showError(err)
 		}
 	case screenSuperusers:
+		ui.setLoadingStatus()
 		if err := ui.activateSelectedSuperuser(); err != nil {
 			ui.showError(err)
 		}
 	case screenCollections:
+		ui.setLoadingStatus()
 		if err := ui.activateSelectedCollection(); err != nil {
 			ui.showError(err)
 		}
 	case screenRecords:
+		ui.setLoadingStatus()
 		if err := ui.activateSelectedRecordDetail(); err != nil {
 			ui.showError(err)
 		}
@@ -476,20 +480,29 @@ func (ui *navigatorTUI) goBack() {
 func (ui *navigatorTUI) refreshCurrentScreen() error {
 	switch ui.screen {
 	case screenDBList:
+		ui.setLoadingStatus()
 		if err := ui.loadDBs(); err != nil {
+			ui.clearLoadingStatus()
 			ui.showError(err)
 			return err
 		}
+		ui.clearLoadingStatus()
 	case screenSuperusers:
+		ui.setLoadingStatus()
 		if err := ui.loadSuperusers(); err != nil {
+			ui.clearLoadingStatus()
 			ui.showError(err)
 			return err
 		}
+		ui.clearLoadingStatus()
 	case screenCollections:
+		ui.setLoadingStatus()
 		if err := ui.loadCollections(); err != nil {
+			ui.clearLoadingStatus()
 			ui.showError(err)
 			return err
 		}
+		ui.clearLoadingStatus()
 	case screenRecords:
 		return ui.fetchAndRenderRecords()
 	}
@@ -653,10 +666,13 @@ func (ui *navigatorTUI) fetchRecords() error {
 }
 
 func (ui *navigatorTUI) fetchAndRenderRecords() error {
+	ui.setLoadingStatus()
 	if err := ui.fetchRecords(); err != nil {
+		ui.clearLoadingStatus()
 		ui.showError(err)
 		return err
 	}
+	ui.clearLoadingStatus()
 	ui.renderCurrentScreen()
 	return nil
 }
@@ -1322,6 +1338,16 @@ func (ui *navigatorTUI) dismissErrorModal() {
 	ui.pages.RemovePage("error")
 	ui.modalOpen = false
 	ui.focusMain()
+}
+
+func (ui *navigatorTUI) setLoadingStatus() {
+	ui.statusMessage = "loading…"
+	ui.statusView.SetText(ui.statusText())
+	ui.app.Draw()
+}
+
+func (ui *navigatorTUI) clearLoadingStatus() {
+	ui.statusMessage = ""
 }
 
 func (ui *navigatorTUI) stopApplication() {
