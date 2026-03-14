@@ -357,6 +357,9 @@ func (ui *navigatorTUI) consumeRuneCommand(key rune) bool {
 		ui.openSuperuserManagerModal()
 		return true
 	case 'r':
+		if ui.isRecordDetailScreen() {
+			return false
+		}
 		_ = ui.refreshCurrentScreen()
 		return true
 	case '[':
