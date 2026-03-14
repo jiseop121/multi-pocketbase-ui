@@ -239,6 +239,7 @@ func (ui *navigatorTUI) setupViews() {
 	ui.detailView.SetTextAlign(tview.AlignLeft)
 	ui.detailView.SetDynamicColors(true)
 	ui.detailView.SetBorder(true)
+	ui.detailView.SetScrollable(true)
 	ui.detailView.SetInputCapture(ui.handleKey)
 
 	ui.layout = tview.NewFlex().SetDirection(tview.FlexRow)
