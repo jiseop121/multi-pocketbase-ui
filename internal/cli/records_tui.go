@@ -279,7 +279,7 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 }
 
 func (ui *navigatorTUI) openFilterModal() {
-	ui.openSubmitCancelInputModal("Filter", "filter", ui.recordsState.Filter, func(val string) error {
+	ui.openSubmitCancelInputModal("Filter", "filter", ui.recordsState.Filter, "name = 'foo' && active = true", func(val string) error {
 		ui.recordsState.Filter = strings.TrimSpace(val)
 		ui.recordsState.Page = 1
 		return ui.fetchAndRenderRecords()
@@ -287,7 +287,7 @@ func (ui *navigatorTUI) openFilterModal() {
 }
 
 func (ui *navigatorTUI) openSortModal() {
-	ui.openSubmitCancelInputModal("Sort", "sort", ui.recordsState.Sort, func(val string) error {
+	ui.openSubmitCancelInputModal("Sort", "sort", ui.recordsState.Sort, "-created,+name", func(val string) error {
 		ui.recordsState.Sort = strings.TrimSpace(val)
 		ui.recordsState.Page = 1
 		return ui.fetchAndRenderRecords()
@@ -1067,10 +1067,11 @@ func (ui *navigatorTUI) openInputModal(title, label, current string, apply func(
 	ui.app.SetFocus(form)
 }
 
-func (ui *navigatorTUI) openSubmitCancelInputModal(title, label, current string, apply func(string) error) {
+func (ui *navigatorTUI) openSubmitCancelInputModal(title, label, current, placeholder string, apply func(string) error) {
 	ui.modalOpen = true
 	form := tview.NewForm()
 	form.AddInputField(label, current, 0, nil, nil)
+	form.GetFormItem(0).(*tview.InputField).SetPlaceholder(placeholder)
 	form.SetBorder(true).SetTitle(" " + title + " ")
 	installSubmitCancelNavigation(form, func() {
 		value := form.GetFormItem(0).(*tview.InputField).GetText()
