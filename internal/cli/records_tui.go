@@ -287,7 +287,7 @@ func (ui *navigatorTUI) openFilterModal() {
 }
 
 func (ui *navigatorTUI) openSortModal() {
-	ui.openInputModal("Sort", "sort", ui.recordsState.Sort, func(val string) error {
+	ui.openSubmitCancelInputModal("Sort", "sort", ui.recordsState.Sort, func(val string) error {
 		ui.recordsState.Sort = strings.TrimSpace(val)
 		ui.recordsState.Page = 1
 		return ui.fetchAndRenderRecords()
