@@ -1165,7 +1165,7 @@ func (ui *navigatorTUI) openDBManagerModal() {
 	})
 	form.SetBorder(true).SetTitle(" DB Aliases ")
 	form.SetButtonsAlign(tview.AlignRight)
-	installFormArrowNavigation(form)
+	installFormArrowNavigationWithClose(form, func() { ui.closeModal("db-manager") })
 
 	ui.modalOpen = true
 	ui.pages.AddPage("db-manager", center(76, 12, form), true, true)
@@ -1230,7 +1230,7 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 	})
 	form.SetBorder(true).SetTitle(" Superusers ")
 	form.SetButtonsAlign(tview.AlignRight)
-	installFormArrowNavigation(form)
+	installFormArrowNavigationWithClose(form, func() { ui.closeModal("superuser-manager") })
 
 	ui.modalOpen = true
 	ui.pages.AddPage("superuser-manager", center(80, 14, form), true, true)
@@ -1312,7 +1312,7 @@ func (ui *navigatorTUI) showError(err error) {
 		ui.dismissErrorModal()
 	})
 	form.SetButtonsAlign(tview.AlignCenter)
-	installFormArrowNavigation(form)
+	installFormArrowNavigationWithClose(form, ui.dismissErrorModal)
 	container := tview.NewFlex().SetDirection(tview.FlexRow)
 	container.AddItem(text, 0, 1, false)
 	container.AddItem(form, 3, 0, true)
@@ -1566,6 +1566,18 @@ func cloneRow(row map[string]any) map[string]any {
 
 func installFormArrowNavigation(form *tview.Form) {
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		return remapFormArrowNavigation(currentFormPrimitive(form), event)
+	})
+}
+
+func installFormArrowNavigationWithClose(form *tview.Form, onClose func()) {
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event != nil && event.Key() == tcell.KeyEsc {
+			if onClose != nil {
+				onClose()
+			}
+			return nil
+		}
 		return remapFormArrowNavigation(currentFormPrimitive(form), event)
 	})
 }
