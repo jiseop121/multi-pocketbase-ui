@@ -457,7 +457,7 @@ func (ui *navigatorTUI) copyRecordDetail() bool {
 		return true
 	}
 	ui.termScreen.SetClipboard([]byte(body))
-	ui.statusMessage = "copied"
+	ui.statusMessage = "copied (OSC52)"
 	if ui.statusView != nil {
 		ui.statusView.SetText(ui.statusText())
 	}
