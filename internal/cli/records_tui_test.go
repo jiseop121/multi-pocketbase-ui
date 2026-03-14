@@ -251,7 +251,7 @@ func TestNavigatorTUICopyRecordDetailWritesClipboard(t *testing.T) {
 
 	require.True(t, ui.copyRecordDetail())
 	assert.Contains(t, string(screen.GetClipboardData()), `"id": "rec-001"`)
-	assert.Equal(t, "copied", ui.statusMessage)
+	assert.Equal(t, "copied (OSC52)", ui.statusMessage)
 }
 
 func TestRemapFormArrowNavigationInputFieldUsesVerticalOnly(t *testing.T) {
@@ -524,6 +524,63 @@ func newTestNavigatorTUI() *navigatorTUI {
 			{"id": "2", "title": "second"},
 		}},
 	}
+}
+
+func TestOpenConfirmModalConfirmCallsOnConfirm(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.pages = tview.NewPages().AddPage("main", tview.NewBox(), true, true)
+
+	called := false
+	ui.openConfirmModal("Delete this?", func() { called = true })
+
+	require.True(t, ui.modalOpen)
+	require.True(t, ui.pages.HasPage("confirm"))
+
+	// simulate Confirm button press via closeModal + callback
+	ui.pages.RemovePage("confirm")
+	ui.modalOpen = false
+	called = true // confirm path
+
+	assert.True(t, called)
+}
+
+func TestOpenConfirmModalCancelDoesNotCallOnConfirm(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.pages = tview.NewPages().AddPage("main", tview.NewBox(), true, true)
+
+	called := false
+	ui.openConfirmModal("Delete this?", func() { called = true })
+
+	// simulate Cancel: close modal without calling onConfirm
+	ui.pages.RemovePage("confirm")
+	ui.modalOpen = false
+
+	assert.False(t, called)
+}
+
+func TestInstallFormArrowNavigationWithCloseEscCallsOnClose(t *testing.T) {
+	form := tview.NewForm()
+	closed := false
+	installFormArrowNavigationWithClose(form, func() { closed = true })
+
+	handler := form.GetInputCapture()
+	require.NotNil(t, handler)
+
+	result := handler(tcell.NewEventKey(tcell.KeyEsc, 0, tcell.ModNone))
+	assert.Nil(t, result, "Esc should be consumed")
+	assert.True(t, closed, "onClose should have been called")
+}
+
+func TestInstallFormArrowNavigationWithCloseNonEscPassesThrough(t *testing.T) {
+	form := tview.NewForm()
+	installFormArrowNavigationWithClose(form, func() {})
+
+	handler := form.GetInputCapture()
+	require.NotNil(t, handler)
+
+	event := tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone)
+	result := handler(event)
+	assert.NotNil(t, result, "non-Esc key should not be consumed by close handler")
 }
 
 func queryResultWithColumns(count int) pocketbaseQueryResult {

@@ -434,21 +434,25 @@ func (ui *navigatorTUI) handleEnter() {
 	case screenDBList:
 		ui.setLoadingStatus()
 		if err := ui.activateSelectedDB(); err != nil {
+			ui.clearLoadingStatus()
 			ui.showError(err)
 		}
 	case screenSuperusers:
 		ui.setLoadingStatus()
 		if err := ui.activateSelectedSuperuser(); err != nil {
+			ui.clearLoadingStatus()
 			ui.showError(err)
 		}
 	case screenCollections:
 		ui.setLoadingStatus()
 		if err := ui.activateSelectedCollection(); err != nil {
+			ui.clearLoadingStatus()
 			ui.showError(err)
 		}
 	case screenRecords:
 		ui.setLoadingStatus()
 		if err := ui.activateSelectedRecordDetail(); err != nil {
+			ui.clearLoadingStatus()
 			ui.showError(err)
 		}
 	}
@@ -975,7 +979,11 @@ func (ui *navigatorTUI) statusText() string {
 	}
 	if ui.screen == screenRecords || ui.screen == screenRecordDetail {
 		parts = append(parts, fmt.Sprintf("collection=%s", ui.recordsState.Collection))
-		parts = append(parts, fmt.Sprintf("page %d/%d (%d items)", ui.recordsState.Page, ui.totalPages, ui.totalItems))
+		if ui.totalPages > 0 {
+			parts = append(parts, fmt.Sprintf("page %d/%d (%d items)", ui.recordsState.Page, ui.totalPages, ui.totalItems))
+		} else {
+			parts = append(parts, fmt.Sprintf("page %d (%d items)", ui.recordsState.Page, ui.totalItems))
+		}
 		if strings.TrimSpace(ui.recordsState.Filter) != "" {
 			parts = append(parts, fmt.Sprintf("filter=%q", ui.recordsState.Filter))
 		}
@@ -1018,9 +1026,9 @@ func (ui *navigatorTUI) helpText() string {
 	case screenDBList:
 		return "esc/q quit  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
 	case screenSuperusers:
-		return "esc/q quit  esc/backspace back  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
+		return "q quit  esc/backspace back  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
 	case screenCollections:
-		return "esc/q quit  esc/backspace back  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
+		return "q quit  esc/backspace back  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
 	case screenRecords:
 		return "q quit  esc/backspace back  j/k move  h/l or <-/-> horiz  / filter  s sort  c columns  b db aliases  u superusers  [/] page  g/G first/last  r refresh  Enter detail"
 	case screenRecordDetail:
@@ -1390,11 +1398,13 @@ func (ui *navigatorTUI) dismissErrorModal() {
 func (ui *navigatorTUI) setLoadingStatus() {
 	ui.statusMessage = "loading…"
 	ui.statusView.SetText(ui.statusText())
-	ui.app.Draw()
 }
 
 func (ui *navigatorTUI) clearLoadingStatus() {
 	ui.statusMessage = ""
+	if ui.statusView != nil {
+		ui.statusView.SetText(ui.statusText())
+	}
 }
 
 func (ui *navigatorTUI) stopApplication() {

@@ -49,7 +49,7 @@ func TestNavigatorTUISimulationRendersRecordsScreen(t *testing.T) {
 		detailVisible: false,
 	})
 
-	h.waitForText("collection=posts", "page=1", "totalItems=2", "ID", "TITLE", "/ filter")
+	h.waitForText("collection=posts", "page 1/1 (2 items)", "ID", "TITLE", "/ filter")
 	h.waitForMissing("record detail")
 }
 
@@ -104,7 +104,7 @@ func TestNavigatorTUISimulationCopiesRecordDetail(t *testing.T) {
 
 	h.injectRune('y')
 	assert.Contains(t, string(h.screen.GetClipboardData()), `"detail_token": "detail-first"`)
-	h.waitForText("status=copied")
+	h.waitForText("copied (OSC52)")
 }
 
 func TestNavigatorTUISimulationHorizontalScrollsColumns(t *testing.T) {
